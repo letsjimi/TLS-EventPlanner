@@ -62,6 +62,7 @@ const app = {
       planner:   () => this.renderPlanner(subPage),
       contacts:  () => this.renderContacts(subPage),
       equipment: () => this.renderEquipment(subPage),
+      catalog:   () => this.openCatalogEditorFromNav(),
       calculation: () => this.renderCalculation(subPage),
       market:    () => this.renderMarket(),
       settings:  () => this.renderSettings()
@@ -1032,71 +1033,6 @@ const app = {
     });
   },
 
-  /* ── Katalog-Picker ── */
-  async openCatalogPicker() {
-    const catalog = await db.equipmentCatalog.toArray();
-    const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
-    const existingNames = new Set(existing.map(e => e.name));
-
-    // Gruppiere nach Kategorie
-    const byCat = {};
-    catalog.forEach(item => {
-      if (!byCat[item.category]) byCat[item.category] = [];
-      byCat[item.category].push(item);
-    });
-
-    const html = `
-      <div style="max-height:60vh;overflow-y:auto">
-        ${Object.keys(byCat).sort().map(cat => `
-          <div style="margin-bottom:var(--space-md)">
-            <h4 style="font-size:0.875rem;color:var(--c-text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">${cat}</h4>
-            ${byCat[cat].map(item => {
-              const isAdded = existingNames.has(item.name);
-              const extBadge = item.isExternal ? `<span style="color:var(--c-warning);font-size:0.75rem;margin-left:6px">🌐 Miete</span>` : '';
-              const tagStr = item.tags ? item.tags.slice(0, 3).map(t => `<span style="background:var(--c-bg);padding:1px 5px;border-radius:3px;font-size:0.7rem;margin-left:4px">${t}</span>`).join('') : '';
-              return `
-                <div style="display:flex;align-items:center;gap:var(--space-sm);padding:6px 8px;border-radius:var(--radius-sm);${isAdded ? 'opacity:0.4' : 'background:var(--c-bg-elev)'}>
-                  <button class="btn btn-sm btn-primary" ${isAdded ? 'disabled' : `onclick="app.addFromCatalog(${item.id})"`} style="flex-shrink:0"><i data-lucide="plus" style="width:12px;height:12px"></i></button>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-weight:600;font-size:0.875rem">${item.name}${extBadge}</div>
-                    <div style="font-size:0.75rem;color:var(--c-text-3);display:flex;align-items:center;flex-wrap:wrap;gap:2px">${item.unit} · ${item.priceDay} €/Tag${tagStr}</div>
-                  </div>
-                  ${isAdded ? '<span style="font-size:0.75rem;color:var(--c-success)">✓</span>' : ''}
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `).join('')}
-      </div>
-    `;
-    UI.openModal('📦 Aus Katalog hinzufügen', html, null, true);
-    lucide.createIcons();
-  },
-
-  async addFromCatalog(catalogId) {
-    const item = await db.equipmentCatalog.get(catalogId);
-    const existing = await db.equipmentItems.where({ eventId: this.currentEventId, name: item.name }).first();
-    if (existing) {
-      UI.toast('Bereits in der Liste', 'warning');
-      return;
-    }
-    await db.equipmentItems.add({
-      eventId: this.currentEventId,
-      category: item.category,
-      name: item.name,
-      qty: 1,
-      needed: true,
-      packed: false,
-      note: '',
-      source: 'catalog',
-      isExternal: !!item.isExternal,
-      priceDay: item.priceDay || 0
-    });
-    UI.toast(`${item.name} hinzugefügt`, 'success');
-    // Re-render picker
-    this.openCatalogPicker();
-  },
-
   /* ── Pakete hinzufügen ── */
   async addPackage(packageName) {
     const pkg = await db.equipmentPackages.where('name').equals(packageName).first();
@@ -1683,20 +1619,33 @@ const app = {
 
   /* ── Katalog-Editor (inline, kein Modal) ── */
   async openCatalogEditor() {
+    this.navigate('#catalog');
+  },
+
+  openCatalogEditorFromNav() {
+    return this.renderCatalog();
+  },
+
+  async renderCatalog() {
     const catalog = await db.equipmentCatalog.toArray();
     const packages = await db.equipmentPackages.toArray();
 
-    const html = `
+    const ownCount = catalog.filter(c => !c.isExternal).length;
+    const extCount = catalog.filter(c => c.isExternal).length;
+
+    return `
       <div class="page-header">
         <div><h1 class="page-title">📦 Katalog-Verwaltung</h1></div>
         <button class="btn btn-primary" onclick="app.addCatalogItem()"><i data-lucide="plus" style="width:14px;height:14px"></i> Neues Gerät</button>
       </div>
 
-      <!-- Geräte -->
-      <h2 style="font-size:1rem;margin:var(--space-lg) 0 var(--space-sm);display:flex;align-items:center;gap:8px">
-        Geräte <span class="badge badge-success" style="font-size:0.7rem">${catalog.length}</span>
-      </h2>
-      <div class="card">
+      <div style="display:flex;gap:var(--space-md);margin-bottom:var(--space-md);flex-wrap:wrap">
+        <span class="badge badge-success">${ownCount} eigene Geräte</span>
+        <span class="badge badge-warning">${extCount} externe Miete</span>
+      </div>
+
+      <!-- Geräte-Tabelle -->
+      <div class="card mb-2">
         <div style="overflow-x:auto">
           <table class="data-table" style="min-width:600px">
             <thead><tr>
@@ -1706,18 +1655,26 @@ const app = {
               <th>€/Tag</th>
               <th>Tags</th>
               <th>Herkunft</th>
-              <th style="width:60px"></th>
+              <th style="width:80px"></th>
             </tr></thead>
             <tbody>
               ${catalog.map(item => `
                 <tr>
-                  <td>${item.category}</td>
+                  <td><span style="color:var(--c-text-3);font-size:0.8125rem">${item.category}</span></td>
                   <td><strong>${item.name}</strong></td>
-                  <td>${item.unit}</td>
-                  <td>${item.priceDay.toFixed(2)}</td>
-                  <td>${(item.tags || []).map(t => `<span class="badge" style="font-size:0.7rem;margin:1px">${t}</span>`).join(' ')}</td>
-                  <td>${item.isExternal ? '<span style="color:var(--c-warning)">🌐 Miete</span>' : '<span style="color:var(--c-success)">TLS Lager</span>'}</td>
-                  <td><button class="btn btn-icon btn-ghost" onclick="app.editCatalogItem(${item.id})"><i data-lucide="pencil" style="width:14px"></i></button></td>
+                  <td>${item.unit || '–'}</td>
+                  <td>${item.priceDay ? item.priceDay.toFixed(2) + ' €' : '–'}</td>
+                  <td>${(item.tags || []).slice(0,4).map(t => `<span class="badge" style="font-size:0.65rem;margin:1px">${t}</span>`).join(' ')}
+                    ${(item.tags || []).length > 4 ? `<span style="font-size:0.65rem;color:var(--c-text-3)">+${item.tags.length-4}</span>` : ''}
+                  </td>
+                  <td>${item.isExternal
+                    ? '<span class="badge badge-warning" style="font-size:0.7rem">🌐 Extern</span>'
+                    : '<span class="badge badge-success" style="font-size:0.7rem">TLS Lager</span>'}
+                  </td>
+                  <td style="white-space:nowrap">
+                    <button class="btn btn-icon btn-ghost" onclick="app.editCatalogItem(${item.id})" title="Bearbeiten"><i data-lucide="pencil" style="width:14px"></i></button>
+                    <button class="btn btn-icon btn-ghost" onclick="app.deleteCatalogItem(${item.id})" title="Löschen"><i data-lucide="trash-2" style="width:14px"></i></button>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1726,27 +1683,28 @@ const app = {
       </div>
 
       <!-- Pakete -->
-      <h2 style="font-size:1rem;margin:var(--space-lg) 0 var(--space-sm);display:flex;align-items:center;gap:8px">
-        Pakete <span class="badge badge-success" style="font-size:0.7rem">${packages.length}</span>
-        <button class="btn btn-sm btn-primary" style="margin-left:auto" onclick="app.addPackageTemplate()"><i data-lucide="plus" style="width:12px;height:12px"></i> Neues Paket</button>
-      </h2>
-      ${packages.map(pkg => `
-        <div class="card mb-2">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <div style="font-weight:700">${pkg.name}</div>
-              <div style="font-size:0.8125rem;color:var(--c-text-3)">${pkg.description}</div>
-            </div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:50%">
-              ${pkg.tags.map(t => `<span class="badge" style="font-size:0.7rem">${t}</span>`).join(' ')}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:var(--space-xl) 0 var(--space-sm)">
+        <h2 style="font-size:1rem;margin:0;display:flex;align-items:center;gap:8px">
+          📦 Pakete <span class="badge badge-success" style="font-size:0.7rem">${packages.length}</span>
+        </h2>
+        <button class="btn btn-sm btn-primary" onclick="app.addPackageTemplate()"><i data-lucide="plus" style="width:12px;height:12px"></i> Neues Paket</button>
+      </div>
+      <div class="grid-2">
+        ${packages.map(pkg => `
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-sm)">
+              <div>
+                <div style="font-weight:700">${pkg.name}</div>
+                <div style="font-size:0.8125rem;color:var(--c-text-3);margin-top:2px">${pkg.description || ''}</div>
+              </div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:45%">
+                ${pkg.tags.map(t => `<span class="badge" style="font-size:0.65rem">${t}</span>`).join(' ')}
+              </div>
             </div>
           </div>
-        </div>
-      `).join('')}
+        `).join('')}
+      </div>
     `;
-
-    document.getElementById('page-content').innerHTML = html;
-    lucide.createIcons();
   },
 
   async addCatalogItem() {
@@ -1803,6 +1761,186 @@ const app = {
       UI.toast('Paket erstellt', 'success');
       this.openCatalogEditor();
     });
+  },
+
+  async deleteCatalogItem(id) {
+    const item = await db.equipmentCatalog.get(id);
+    if (!item) return;
+    UI.confirm(`Gerät "${item.name}" aus dem Katalog löschen?\n\nDas entfernt es nicht aus bestehenden Events, nur aus dem Katalog.`, async () => {
+      await db.equipmentCatalog.delete(id);
+      UI.toast('Gerät aus Katalog entfernt', 'info');
+      this.navigate('#catalog');
+    });
+  },
+
+  // ═══════════════════════════════════════════════
+  // KATALOG-PICKER (mit Mengenauswahl)
+  // ═══════════════════════════════════════════════
+  async openCatalogPicker() {
+    const catalog = await db.equipmentCatalog.toArray();
+    const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
+    const existingMap = new Map(existing.map(e => [e.name, e]));
+
+    // Gruppiere nach Kategorie
+    const byCat = {};
+    catalog.forEach(item => {
+      if (!byCat[item.category]) byCat[item.category] = [];
+      byCat[item.category].push(item);
+    });
+
+    const html = `
+      <div style="max-height:65vh;overflow-y:auto;padding-right:4px">
+        <style>
+          .cat-picker-item {
+            display: flex; align-items: center; gap: var(--space-sm);
+            padding: 10px 8px;
+            border-radius: var(--radius-md);
+            margin-bottom: 4px;
+            transition: background 150ms;
+          }
+          .cat-picker-item:hover { background: var(--c-bg-elev); }
+          .cat-picker-item.added { opacity: 0.45; background: var(--c-bg); }
+          .qty-control {
+            display: flex; align-items: center; gap: 2px;
+            background: var(--c-bg);
+            border: 1px solid var(--c-border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+          }
+          .qty-control button {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            background: none; border: none; cursor: pointer;
+            font-size: 1.1rem; font-weight: 700;
+            color: var(--c-accent);
+            transition: background 150ms;
+          }
+          .qty-control button:hover { background: var(--c-bg-elev); }
+          .qty-control button:active { background: var(--c-border); }
+          .qty-control .qty-value {
+            width: 36px; text-align: center;
+            font-weight: 600; font-size: 0.9375rem;
+            border: none; background: none;
+            color: var(--c-text);
+            -moz-appearance: textfield;
+          }
+          .qty-control .qty-value::-webkit-outer-spin-button,
+          .qty-control .qty-value::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+          .add-big-btn {
+            width: 48px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: var(--radius-md);
+            border: 2px dashed var(--c-accent);
+            background: var(--c-bg);
+            color: var(--c-accent);
+            cursor: pointer;
+            transition: all 150ms;
+            flex-shrink: 0;
+          }
+          .add-big-btn:hover {
+            background: var(--c-accent);
+            color: white;
+            border-style: solid;
+          }
+          .add-big-btn:active { transform: scale(0.95); }
+          .add-big-btn.added {
+            border-color: var(--c-success);
+            background: var(--c-success);
+            color: white;
+            border-style: solid;
+          }
+          .add-big-btn .lucide { width: 22px; height: 22px; }
+        </style>
+
+        ${Object.keys(byCat).sort().map(cat => `
+          <div style="margin-bottom:var(--space-md)">
+            <h4 style="font-size:0.8125rem;color:var(--c-text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600">${cat}</h4>
+            ${byCat[cat].map(item => {
+              const already = existingMap.get(item.name);
+              const isAdded = !!already;
+              const extBadge = item.isExternal ? `<span class="badge badge-warning" style="font-size:0.65rem;margin-left:6px">🌐 Miete</span>` : '';
+              const tagStr = item.tags ? item.tags.slice(0, 3).map(t => `<span style="background:var(--c-bg);padding:2px 6px;border-radius:4px;font-size:0.7rem;margin-left:4px;color:var(--c-text-3)">${t}</span>`).join('') : '';
+              return `
+                <div class="cat-picker-item ${isAdded ? 'added' : ''}">
+                  <!-- Mengensteuerung -->
+                  <div class="qty-control">
+                    <button onclick="app.adjustQty(${item.id}, -1)">−</button>
+                    <input type="number" class="qty-value" id="qty-${item.id}" value="1" min="1"
+                      onchange="app.clampQty(${item.id})" onkeydown="if(event.key==='Enter')app.addFromCatalog(${item.id})">
+                    <button onclick="app.adjustQty(${item.id}, 1)">+</button>
+                  </div>
+
+                  <!-- Info -->
+                  <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;font-size:0.9375rem;display:flex;align-items:center">
+                      ${item.name}${extBadge}
+                    </div>
+                    <div style="font-size:0.75rem;color:var(--c-text-3);display:flex;align-items:center;flex-wrap:wrap;gap:3px;margin-top:1px">
+                      ${item.unit} · ${item.priceDay > 0 ? item.priceDay.toFixed(2) + ' €/Tag' : 'inkl.'}${tagStr}
+                    </div>
+                  </div>
+
+                  <!-- Große Add-Taste -->
+                  <button class="add-big-btn ${isAdded ? 'added' : ''}" id="btn-add-${item.id}"
+                    onclick="app.addFromCatalog(${item.id})"
+                    title="${isAdded ? 'Bereits in Packliste' : 'Zur Packliste hinzufügen'}">
+                    <i data-lucide="${isAdded ? 'check' : 'plus'}" style="width:22px;height:22px"></i>
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `).join('')}
+      </div>
+    `;
+    UI.openModal('📦 Katalog', html, null, true);
+    lucide.createIcons();
+  },
+
+  adjustQty(id, delta) {
+    const input = document.getElementById(`qty-${id}`);
+    if (!input) return;
+    let v = parseInt(input.value) || 1;
+    v = Math.max(1, v + delta);
+    input.value = v;
+  },
+
+  clampQty(id) {
+    const input = document.getElementById(`qty-${id}`);
+    if (!input) return;
+    let v = parseInt(input.value) || 1;
+    if (v < 1) v = 1;
+    input.value = v;
+  },
+
+  async addFromCatalog(catalogId) {
+    const item = await db.equipmentCatalog.get(catalogId);
+    const qtyInput = document.getElementById(`qty-${catalogId}`);
+    const qty = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
+
+    const existing = await db.equipmentItems.where({ eventId: this.currentEventId, name: item.name }).first();
+    if (existing) {
+      // Update quantity instead of error
+      await db.equipmentItems.update(existing.id, { qty: existing.qty + qty });
+      UI.toast(`${item.name}: +${qty} (jetzt ${existing.qty + qty})`, 'success');
+      this.openCatalogPicker();
+      return;
+    }
+
+    await db.equipmentItems.add({
+      eventId: this.currentEventId,
+      category: item.category,
+      name: item.name,
+      qty: qty,
+      needed: true,
+      packed: false,
+      note: '',
+      source: 'catalog',
+      isExternal: !!item.isExternal,
+      priceDay: item.priceDay || 0
+    });
+    UI.toast(`${item.name} × ${qty} hinzugefügt`, 'success');
+    this.openCatalogPicker();
   },
 
   async resetDatabase() {
