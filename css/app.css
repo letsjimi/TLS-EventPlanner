@@ -217,6 +217,21 @@ body {
 
 .menu-toggle:hover { background: var(--c-bg-hover); color: var(--c-text); }
 
+/* ═══ SIDEBAR OVERLAY (Mobile) ═══ */
+.sidebar-overlay {
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 99;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-base), visibility var(--transition-base);
+}
+.sidebar-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
 .topbar-search {
   flex: 1;
   max-width: 400px;

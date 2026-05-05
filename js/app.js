@@ -85,14 +85,20 @@ const app = {
       el.addEventListener('click', (e) => {
         if (window.innerWidth < 768) {
           document.getElementById('sidebar').classList.remove('open');
+          document.getElementById('sidebar-overlay')?.classList.remove('active');
         }
       });
     });
   },
 
   bindMobileMenu() {
-    document.getElementById('menu-toggle').addEventListener('click', () => {
+    this.toggleSidebar = () => {
       document.getElementById('sidebar').classList.toggle('open');
+      const overlay = document.getElementById('sidebar-overlay');
+      if (overlay) overlay.classList.toggle('active');
+    };
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      this.toggleSidebar();
     });
   },
 
