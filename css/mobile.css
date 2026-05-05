@@ -49,6 +49,38 @@ input::placeholder { color: var(--c-text-3); }
   .sidebar-brand,
   .sidebar-footer { display: none !important; }
 
+  /* ── Event Detail Tabs ──────────────────── */
+  .event-tabs .btn-sm {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  /* ── Sidebar-Footer als Icon-Leiste über der Nav (Mobile) ── */
+  .sidebar-footer {
+    display: flex !important;
+    position: fixed;
+    bottom: calc(64px + env(safe-area-inset-bottom, 20px));
+    left: 0; right: 0;
+    flex-direction: row;
+    justify-content: center;
+    gap: var(--space-lg);
+    padding: 6px 0;
+    background: var(--c-bg-elev);
+    border-top: 1px solid var(--c-border);
+    z-index: 199;
+  }
+  .sidebar-footer .btn-ghost {
+    padding: 6px;
+    font-size: 0;
+    border: none;
+    color: var(--c-text-3);
+  }
+  .sidebar-footer .btn-ghost i {
+    width: 20px; height: 20px;
+    margin: 0;
+  }
+  .sidebar-footer .btn-ghost span { display: none; }
+
   .sidebar-nav {
     display: flex; flex-direction: row;
     justify-content: space-around; align-items: center;
@@ -69,7 +101,7 @@ input::placeholder { color: var(--c-text-3); }
   .nav-badge { position: absolute; top: 0; right: 8px; }
 
   /* ── Main ───────────────────────────────── */
-  .main { margin-left: 0; margin-bottom: calc(60px + var(--safe-bottom)); }
+  .main { margin-left: 0; margin-bottom: calc(100px + var(--safe-bottom)); }
 
   /* ── Topbar ─────────────────────────────── */
   .topbar {

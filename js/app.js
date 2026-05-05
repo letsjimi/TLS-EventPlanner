@@ -532,7 +532,7 @@ const app = {
       </div>
 
       <!-- TABS -->
-      <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-lg);border-bottom:1px solid var(--c-border);padding-bottom:var(--space-sm)">
+      <div class="event-tabs" style="display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-bottom:var(--space-lg);border-bottom:1px solid var(--c-border);padding-bottom:var(--space-sm)">
         <button class="btn btn-sm btn-secondary" onclick="app.navigate('#planner/${e.id}')">📍 Planung</button>
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#contacts/${e.id}')">👥 Kontakte</button>
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#equipment/${e.id}')">🎛️ Equipment</button>
@@ -778,7 +778,7 @@ const app = {
         <button class="btn btn-primary" onclick="app.addContact()"><i data-lucide="plus" style="width:16px;height:16px"></i>Kontakt</button>
       </div>
 
-      <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-lg);border-bottom:1px solid var(--c-border);padding-bottom:var(--space-sm)">
+      <div class="event-tabs" style="display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-bottom:var(--space-lg);border-bottom:1px solid var(--c-border);padding-bottom:var(--space-sm)">
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#planner/${e.id}')">📍 Planung</button>
         <button class="btn btn-sm btn-secondary" onclick="app.navigate('#contacts/${e.id}')">👥 Kontakte</button>
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#equipment/${e.id}')">🎛️ Equipment</button>
@@ -955,7 +955,7 @@ const app = {
         </div>
       </div>
 
-      <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-lg);border-bottom:1px solid var(--c-border);padding-bottom:var(--space-sm)">
+      <div class="event-tabs" style="display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-bottom:var(--space-lg);border-bottom:1px solid var(--c-border);padding-bottom:var(--space-sm)">
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#planner/${e.id}')">📍 Planung</button>
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#contacts/${e.id}')">👥 Kontakte</button>
         <button class="btn btn-sm btn-secondary" onclick="app.navigate('#equipment/${e.id}')">🎛️ Equipment</button>
@@ -1135,7 +1135,7 @@ const app = {
         </div>
       </div>
 
-      <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-lg);border-bottom:1px solid var(--c-border);padding-bottom:var(--space-sm)">
+      <div class="event-tabs" style="display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-bottom:var(--space-lg);border-bottom:1px solid var(--c-border);padding-bottom:var(--space-sm)">
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#planner/${e.id}')">📍 Planung</button>
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#contacts/${e.id}')">👥 Kontakte</button>
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#equipment/${e.id}')">🎛️ Equipment</button>
