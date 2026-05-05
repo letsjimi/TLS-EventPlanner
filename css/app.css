@@ -839,208 +839,30 @@ body {
 .hidden { display: none !important; }
 
 /* ═══════════════════════════════════════════════
-   PRINT STYLES — PDF-Export Optimierung
+   PRINT STYLES (PDF-Export via window.print())
    ═══════════════════════════════════════════════ */
 @media print {
-  /* Seiteneinstellungen */
-  @page {
-    size: A4 portrait;
-    margin: 18mm 16mm 22mm 16mm;
-  }
-
-  /* Ausblenden */
-  .sidebar, .topbar, .menu-toggle,
+  .sidebar, .topbar, .menu-toggle, .btn-ghost,
   .modal-overlay, .modal, .toast-container,
-  .btn-ghost, .btn-primary, .btn-secondary, .btn-icon,
-  .kanban-card .kanban-card-meta span:last-child,
-  .maps-row,               /* Maps-Buttons im PDF sinnlos */
-  #global-search,
-  .page-header .btn-secondary,   /* Bearbeiten/Teilen/Löschen */
-  .page-header .btn-ghost {
+  .btn-primary, .btn-secondary, .btn-icon,
+  .kanban-card .kanban-card-meta span:last-child {
     display: none !important;
   }
 
-  /* Basis */
-  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body {
-    background: white !important;
-    color: #1a1a1a !important;
-    font-size: 10pt !important;
-    line-height: 1.4 !important;
-  }
   .main { margin-left: 0 !important; }
-  .page-content { padding: 0 !important; }
+  .page-content { padding: 20px !important; }
 
-  /* ── Print-Header (nur auf Seite 1) ── */
-  .page-content::before {
-    content: 'TLS LIVE SOUND  ·  Event-Planung';
-    display: block;
-    text-align: center;
-    font-size: 8pt;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    color: #e94560;
-    border-bottom: 1.5pt solid #e94560;
-    padding-bottom: 6pt;
-    margin-bottom: 14pt;
-  }
-
-  /* ── Seitenumbruch-Regeln ── */
-  h1.page-title, h2, h3 {
-    page-break-after: avoid;
-    break-after: avoid;
-  }
-
-  /* Karten: erlaube Umbruch, aber nur zwischen Abschnitten */
   .card {
-    border: 0.5pt solid #bbb;
-    border-radius: 4pt;
-    padding: 10pt;
-    margin-bottom: 10pt;
-    page-break-inside: auto;          /* Erlaubt — aber Kinder schützen sich */
-    break-inside: auto;
-  }
-
-  /* ── Tabellen ── */
-  .data-table {
-    font-size: 9pt;
-    border-collapse: collapse;
-    width: 100%;
-  }
-  .data-table thead {
-    display: table-header-group;      /* Wiederholen auf jeder Seite */
-  }
-  .data-table th {
-    background: #f0f0f0 !important;
-    color: #333 !important;
-    font-weight: 700;
-    border-bottom: 1pt solid #999;
-    padding: 4pt 6pt;
-  }
-  .data-table td {
-    padding: 4pt 6pt;
-    border-bottom: 0.3pt solid #ddd;
-  }
-  .data-table tbody tr {
-    page-break-inside: avoid;
+    border: 1px solid #ccc;
     break-inside: avoid;
-  }
-
-  /* ── Timeline ── */
-  .timeline { position: relative; padding-left: 24pt; }
-  .timeline::before {
-    left: 6pt;
-    background: #ccc !important;
-    width: 1.5pt;
-  }
-  .timeline-item {
     page-break-inside: avoid;
-    break-inside: avoid;
-    padding-left: 18pt;
-    margin-bottom: 8pt;
-  }
-  .timeline-dot {
-    left: 0;
-    width: 10pt; height: 10pt;
-    border: 1.5pt solid #e94560;
-    background: white !important;
-  }
-  .timeline-dot.done { background: #e94560 !important; }
-  .timeline-time {
-    font-size: 8pt;
-    color: #666;
-    font-weight: 600;
-  }
-  .timeline-title { font-size: 10pt; font-weight: 700; }
-  .timeline-desc  { font-size: 9pt; color: #555; }
-
-  /* ── Locations ── */
-  .card > div[style*="flex-direction:column"] > div,
-  .card > div[style*="gap:var(--space-md)"] > div {
-    page-break-inside: avoid;
-    break-inside: avoid;
-    border-bottom: 0.3pt solid #eee;
-    padding: 6pt 0;
   }
 
-  /* ── Kontakt-Karten im Grid ── */
-  .grid-2 > .card, .grid-2 > div {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
+  .timeline::before { background: #ccc !important; }
+  .timeline-dot { border-color: white !important; }
 
-  /* ── Status-Badges für Druck ── */
-  .status-badge {
-    border: 0.5pt solid currentColor !important;
-    background: transparent !important;
-    font-size: 8pt;
-    padding: 1pt 5pt;
-  }
-  .status-offer     { color: #b45309 !important; }
-  .status-confirmed { color: #15803d !important; }
-  .status-done      { color: #1d4ed8 !important; }
-
-  /* ── Text-Fluss ── */
-  p, li, div {
-    orphans: 3;
-    widows: 3;
-  }
-
-  /* ── Section-Trenner ── */
-  .card + .card {
-    /* Kein Extra-Margin, damit nicht zu viel Weißraum */
-  }
-
-  /* ── Verhindere alleinstehende Überschriften ── */
-  h1, h2, h3, .card-title {
-    orphans: 4;
-    widows: 4;
-    page-break-after: avoid;
-    break-after: avoid;
-  }
-  h1 + div, h2 + div, h3 + div,
-  .card-title + div {
-    page-break-before: avoid;
-    break-before: avoid;
-  }
-
-  /* ── Preis / Euro ── */
-  .text-accent { color: #c41e3a !important; }
-
-  /* ── Links ── */
-  a { color: #1a1a1a !important; text-decoration: none; }
-  a[href^="tel:"]::before { content: '📞 '; }
-  a[href^="mailto:"]::before { content: '✉️ '; }
-
-  /* ── Share-Preview ── */
-  .share-preview { padding: 0 !important; max-width: 100%; }
-  .share-header { padding: 8pt 0; margin-bottom: 10pt; border-bottom: 1.5pt solid #e94560; }
-  .share-brand { font-size: 14pt; color: #e94560 !important; }
-  .share-sub   { font-size: 8pt; }
-  .share-watermark { position: static; font-size: 7pt; opacity: 0.6; margin-top: 10pt; text-align: right; }
-
-  /* ── Section-Header ── */
-  .card h3, .share-preview h3 {
-    font-size: 10pt;
-    border-bottom: 0.5pt solid #ddd;
-    padding-bottom: 3pt;
-    margin-bottom: 6pt;
-    page-break-after: avoid;
-    break-after: avoid;
-  }
-
-  /* ── Tab-Navigation ausblenden ── */
-  .page-header + div[style*="display:flex"] {
-    display: none !important;
-  }
-
-  /* ── Event-Selector Grid auf Druck ── */
-  .grid-2 > .card[style*="cursor:pointer"] {
-    cursor: default;
-  }
-
-  /* ── Kein Box-Shadow im Druck ── */
-  * { box-shadow: none !important; }
+  body { background: white !important; color: black !important; }
+  .page-title { color: black !important; }
 }
 
 /* ═══════════════════════════════════════════════
