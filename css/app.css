@@ -201,7 +201,7 @@ body {
   padding: 0 var(--space-xl);
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 150;
 }
 
 .menu-toggle {
@@ -837,3 +837,155 @@ body {
 .mb-3 { margin-bottom: var(--space-lg); }
 
 .hidden { display: none !important; }
+
+/* ═══════════════════════════════════════════════
+   PRINT STYLES (PDF-Export via window.print())
+   ═══════════════════════════════════════════════ */
+@media print {
+  .sidebar, .topbar, .menu-toggle, .btn-ghost,
+  .modal-overlay, .modal, .toast-container,
+  .btn-primary, .btn-secondary, .btn-icon,
+  .kanban-card .kanban-card-meta span:last-child {
+    display: none !important;
+  }
+
+  .main { margin-left: 0 !important; }
+  .page-content { padding: 20px !important; }
+
+  .card {
+    border: 1px solid #ccc;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .timeline::before { background: #ccc !important; }
+  .timeline-dot { border-color: white !important; }
+
+  body { background: white !important; color: black !important; }
+  .page-title { color: black !important; }
+}
+
+/* ═══════════════════════════════════════════════
+   LOCK SCREEN (App-Passwort)
+   ═══════════════════════════════════════════════ */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--c-bg);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.lock-card {
+  background: var(--c-bg-elev);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.lock-icon {
+  width: 64px; height: 64px;
+  background: var(--c-accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto var(--space-lg);
+  color: white;
+}
+
+.lock-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: var(--space-sm);
+}
+
+.lock-sub {
+  color: var(--c-text-2);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-xl);
+}
+
+/* ═══════════════════════════════════════════════
+   SHARE LINK PREVIEW (öffentliche Ansicht)
+   ═══════════════════════════════════════════════ */
+.share-preview {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+}
+
+.share-header {
+  text-align: center;
+  padding: var(--space-2xl) 0;
+  border-bottom: 2px solid var(--c-accent);
+  margin-bottom: var(--space-xl);
+}
+
+.share-brand {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--c-accent);
+  letter-spacing: -0.02em;
+}
+
+.share-sub {
+  color: var(--c-text-2);
+  font-size: 0.875rem;
+  margin-top: var(--space-sm);
+}
+
+.share-watermark {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  font-size: 0.75rem;
+  color: var(--c-text-3);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════
+   MAPS BUTTONS
+   ═══════════════════════════════════════════════ */
+.maps-row {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.btn-map {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.btn-map.google {
+  background: rgba(66, 133, 244, 0.15);
+  color: #4285f4;
+  border: 1px solid rgba(66, 133, 244, 0.3);
+}
+
+.btn-map.google:hover {
+  background: rgba(66, 133, 244, 0.25);
+}
+
+.btn-map.apple {
+  background: rgba(0, 122, 255, 0.15);
+  color: #007aff;
+  border: 1px solid rgba(0, 122, 255, 0.3);
+}
+
+.btn-map.apple:hover {
+  background: rgba(0, 122, 255, 0.25);
+}

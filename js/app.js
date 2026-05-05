@@ -15,6 +15,7 @@ const app = {
     this.bindNavigation();
     this.bindMobileMenu();
     this.bindGlobalSearch();
+    this.checkLock();          // Lock-Screen prüfen
     this.navigate(location.hash || '#dashboard');
     window.addEventListener('hashchange', () => this.navigate(location.hash));
     lucide.createIcons();
@@ -24,9 +25,27 @@ const app = {
   // ROUTER
   // ═══════════════════════════════════════════════
   navigate(hash) {
-    const page = hash.replace('#', '') || 'dashboard';
-    const [mainPage, subPage] = page.split('/');
+    const raw = hash.replace('#', '') || 'dashboard';
+    const [mainPage, subPage] = raw.split('/');
+
+    // SHARE ROUTE (/share/:token)
+    if (mainPage === 'share' && subPage) {
+      this.renderShare(decodeURIComponent(subPage)).then(html => {
+        document.getElementById('page-content').innerHTML = html;
+        document.querySelector('.sidebar')?.classList.add('hidden');
+        document.querySelector('.topbar')?.classList.add('hidden');
+        lucide.createIcons();
+      });
+      return;
+    }
+
+    // LOCK CHECK (ausser bei Dashboard/Market/Export-Seiten)
+    this.checkLock();
+
+    // NORMAL ROUTE
     this.currentPage = mainPage;
+    document.querySelector('.sidebar')?.classList.remove('hidden');
+    document.querySelector('.topbar')?.classList.remove('hidden');
 
     // Sidebar active state
     document.querySelectorAll('.nav-item').forEach(el => {
@@ -79,8 +98,40 @@ const app = {
     const search = document.getElementById('global-search');
     search.addEventListener('input', (e) => {
       this.searchQuery = e.target.value.toLowerCase();
-      if (this.currentPage === 'events') this.renderEvents(this.searchQuery);
-      if (this.currentPage === 'contacts') this.renderContacts(null, this.searchQuery);
+      if (this.currentPage === 'events') this.refreshEvents();
+      if (this.currentPage === 'contacts') this.refreshContacts();
+      if (this.currentPage === 'equipment') this.refreshEquipment();
+    });
+  },
+
+  refreshEvents() {
+    const grid = document.getElementById('events-grid');
+    if (!grid) return;
+    this.renderEvents(this.searchQuery).then(html => {
+      grid.innerHTML = html;
+      lucide.createIcons();
+    });
+  },
+
+  refreshContacts() {
+    const list = document.getElementById('contacts-list');
+    if (!list) return;
+    this.renderContacts(null, this.searchQuery).then(html => {
+      list.innerHTML = html;
+      lucide.createIcons();
+    });
+  },
+
+  refreshEquipment() {
+    const grid = document.getElementById('equipment-grid');
+    if (!grid) return;
+    this.renderEquipment(null, this.searchQuery).then(html => {
+      // Nur Event-Liste ersetzen (nicht Detail-Ansicht)
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const newGrid = tmp.querySelector('#equipment-grid');
+      if (newGrid) grid.innerHTML = newGrid.innerHTML;
+      lucide.createIcons();
     });
   },
 
@@ -258,6 +309,7 @@ const app = {
         </button>
       </div>
 
+      <div id="events-grid">
       ${events.length === 0 ? UI.emptyState('inbox', 'Keine Aufträge', 'Erstelle deinen ersten Auftrag mit dem Button oben.') : `
         <div class="card">
           <table class="data-table">
@@ -293,7 +345,8 @@ const app = {
             </tbody>
           </table>
         </div>
-      `}`;
+      `}
+      </div>`;
   },
 
   // ═══════════════════════════════════════════════
@@ -464,6 +517,9 @@ const app = {
           <p class="page-subtitle">${e.eventType} · ${UI.formatDate(e.date)} · ${e.locations || 'Keine Location'}</p>
         </div>
         <div style="display:flex;gap:var(--space-sm)">
+          <button class="btn btn-secondary btn-sm" onclick="app.shareEvent(${e.id})" title="Öffentlichen Link erstellen">
+            <i data-lucide="share-2" style="width:16px;height:16px"></i>Teilen
+          </button>
           <button class="btn btn-secondary" onclick="app.editEvent(${e.id})">
             <i data-lucide="pencil" style="width:16px;height:16px"></i>Bearbeiten
           </button>
@@ -521,6 +577,18 @@ const app = {
             </div>
             ${l.notes ? `<div class="text-muted mt-1" style="font-size:0.8125rem">📝 ${l.notes}</div>` : ''}
             ${l.contactName ? `<div class="text-muted mt-1" style="font-size:0.8125rem">👤 ${l.contactName}${l.contactPhone ? ' · ' + l.contactPhone : ''}</div>` : ''}
+            ${l.address ? `
+            <div class="maps-row">
+              <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}" target="_blank" rel="noopener" class="btn-map google"
+                onclick="event.stopPropagation()">
+                <i data-lucide="map-pin" style="width:12px;height:12px"></i> Google Maps
+              </a>
+              <a href="http://maps.apple.com/?q=${encodeURIComponent(l.address)}" target="_blank" rel="noopener" class="btn-map apple"
+                onclick="event.stopPropagation()">
+                <i data-lucide="navigation" style="width:12px;height:12px"></i> Apple Maps
+              </a>
+            </div>
+            ` : ''}
           </div>
           <div style="display:flex;flex-direction:column;gap:4px">
             <button class="btn btn-icon btn-ghost" onclick="app.editLocation(${l.id})"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
@@ -668,13 +736,19 @@ const app = {
   // ═══════════════════════════════════════════════
   // CONTACTS
   // ═══════════════════════════════════════════════
-  async renderContacts(eventId) {
+  async renderContacts(eventId, search = '') {
     if (!eventId) {
-      const events = await db.events.toArray();
+      let events = await db.events.toArray();
+      if (search) {
+        events = events.filter(e =>
+          (e.clientName || '').toLowerCase().includes(search) ||
+          (e.eventType || '').toLowerCase().includes(search)
+        );
+      }
       return `
         <div class="page-header"><h1 class="page-title">Kontakte</h1></div>
         <p class="text-muted mb-2">Wähle einen Auftrag:</p>
-        <div class="grid-2">${events.map(e => `
+        <div class="grid-2" id="contacts-list">${events.map(e => `
           <div class="card" style="cursor:pointer" onclick="app.navigate('#contacts/${e.id}')">
             <div style="font-weight:700">${e.clientName}</div>
             <div class="text-muted" style="font-size:0.875rem">${e.orderNumber} · ${UI.formatDate(e.date)}</div>
@@ -684,7 +758,14 @@ const app = {
 
     this.currentEventId = parseInt(eventId);
     const e = await db.events.get(this.currentEventId);
-    const contacts = await db.contacts.where('eventId').equals(this.currentEventId).toArray();
+    let contacts = await db.contacts.where('eventId').equals(this.currentEventId).toArray();
+    if (search) {
+      contacts = contacts.filter(c =>
+        (c.name || '').toLowerCase().includes(search) ||
+        (c.role || '').toLowerCase().includes(search) ||
+        (c.phone || '').toLowerCase().includes(search)
+      );
+    }
 
     return `
       <div class="page-header">
@@ -702,7 +783,7 @@ const app = {
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#calculation/${e.id}')">💰 Kalkulation</button>
       </div>
 
-      <div class="grid-2">
+      <div class="grid-2" id="contacts-list">
         ${contacts.length === 0 ? UI.emptyState('users', 'Keine Kontakte', 'Füge den ersten Ansprechpartner hinzu.') :
           contacts.map(c => `
             <div class="card">
@@ -777,13 +858,19 @@ const app = {
   // ═══════════════════════════════════════════════
   // EQUIPMENT
   // ═══════════════════════════════════════════════
-  async renderEquipment(eventId) {
+  async renderEquipment(eventId, search = '') {
     if (!eventId) {
-      const events = await db.events.toArray();
+      let events = await db.events.toArray();
+      if (search) {
+        events = events.filter(e =>
+          (e.clientName || '').toLowerCase().includes(search) ||
+          (e.eventType || '').toLowerCase().includes(search)
+        );
+      }
       return `
         <div class="page-header"><h1 class="page-title">Equipment</h1></div>
         <p class="text-muted mb-2">Wähle einen Auftrag:</p>
-        <div class="grid-2">${events.map(e => `
+        <div class="grid-2" id="equipment-grid">${events.map(e => `
           <div class="card" style="cursor:pointer" onclick="app.navigate('#equipment/${e.id}')">
             <div style="font-weight:700">${e.clientName}</div>
             <div class="text-muted" style="font-size:0.875rem">${e.orderNumber} · ${UI.formatDate(e.date)}</div>
@@ -793,8 +880,15 @@ const app = {
 
     this.currentEventId = parseInt(eventId);
     const e = await db.events.get(this.currentEventId);
-    const items = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
+    let items = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
     const catalog = await db.equipmentCatalog.toArray();
+
+    if (search) {
+      items = items.filter(i =>
+        (i.name || '').toLowerCase().includes(search) ||
+        (i.category || '').toLowerCase().includes(search)
+      );
+    }
 
     // Group by category
     const byCat = {};
@@ -1141,6 +1235,206 @@ const app = {
   // ═══════════════════════════════════════════════
   openEvent(id) {
     this.navigate(`#planner/${id}`);
+  },
+
+  // ═══════════════════════════════════════════════
+  // PDF EXPORT
+  // ═══════════════════════════════════════════════
+  exportPDF() {
+    // Add print class to body for one event
+    document.body.classList.add('printing');
+    window.print();
+    document.body.classList.remove('printing');
+  },
+
+  // ═══════════════════════════════════════════════
+  // SHARE LINK GENERATOR (sicheres Public-Token)
+  // ═══════════════════════════════════════════════
+  async shareEvent(eventId) {
+    const e = await db.events.get(eventId);
+    if (!e) return;
+    const publicToken = btoa(encodeURIComponent(JSON.stringify({
+      id: eventId,
+      n: e.orderNumber,
+      c: e.clientName,
+      d: e.date,
+      t: Date.now()     // timestamp for versioning
+    }))).replace(/[+/=]/g, '-');  // URL-safe
+
+    const baseUrl = window.location.href.split('#')[0];
+    const shareUrl = `${baseUrl}#share/${publicToken}`;
+
+    // Copy to clipboard
+    try { await navigator.clipboard.writeText(shareUrl); } catch (_) {}
+
+    UI.openModal('🔗 Teilen', `
+      <div style="display:flex;flex-direction:column;gap:var(--space-md);text-align:center">
+        <p class="text-muted">Dieser Link zeigt das Event öffentlich – ohne Bearbeiten:</p>
+        <div class="card" style="background:var(--c-bg);font-family:monospace;font-size:0.8125rem;word-break:break-all;user-select:all;padding:var(--space-md)"
+        onclick="navigator.clipboard.writeText('${shareUrl}');UI.toast('Kopiert','success')" title="Klicken zum Kopieren">
+          ${shareUrl}
+        </div>
+        <div class="text-muted" style="font-size:0.75rem">⚠️ Jeder mit dem Link kann die Planung ansehen. Link enthält keine Zugangsdaten.</div>
+      </div>`, null, 'Schließen');
+  },
+
+  async renderShare(token) {
+    try {
+      const decoded = JSON.parse(decodeURIComponent(atob(token.replace(/-/g, '+'))));
+      if (!decoded.id) throw new Error('Invalid token');
+
+      const e = await db.events.get(decoded.id);
+      if (!e) return `<div class="share-preview">
+        <div class="share-header">
+          <div class="share-brand">TLS Event Manager</div>
+          <div class="share-sub">Dieser Link ist ungültig oder abgelaufen.</div>
+        </div>
+      </div>`;
+
+      const locations = await db.locations.where('eventId').equals(e.id).toArray();
+      const timeline = await db.timeline.where('eventId').equals(e.id).sortBy('time');
+      const contacts = await db.contacts.where('eventId').equals(e.id).toArray();
+
+      return `<div class="share-preview">
+        <div class="share-header">
+          <div class="share-brand">TLS Live Sound</div>
+          <div class="share-sub">Veranstaltungsplanung · Timon Letschert</div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:var(--space-md)">
+            <div>
+              <div class="text-muted" style="font-size:0.75rem">${e.orderNumber}</div>
+              <h1 style="font-size:1.5rem;font-weight:800">${e.clientName}</h1>
+              <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;margin-top:var(--space-xs)">
+                <span class="status-badge status-${e.status}">${e.status}</span>
+                <span style="color:var(--c-text-2);font-size:0.875rem">${e.eventType}</span>
+                <span style="color:var(--c-text-2);font-size:0.875rem">${e.personCount || '-'} Pers.</span>
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:1.5rem;font-weight:700;color:var(--c-accent)">${UI.formatDate(e.date)}</div>
+              <div style="font-size:0.875rem;color:var(--c-text-2)">${e.startTime || ''} ${e.endTime ? '- ' + e.endTime : ''}</div>
+            </div>
+          </div>
+        </div>
+
+        ${locations.length > 0 ? `
+          <div class="card">
+            <h3 style="margin-bottom:var(--space-md);font-size:1rem">📍 Locations</h3>
+            ${locations.map((l,i) => `
+              <div style="display:flex;gap:var(--space-md);padding:var(--space-md) 0;border-bottom:1px solid var(--c-border)">
+                <div style="font-size:1.25rem;font-weight:800;color:var(--c-accent)">${i+1}</div>
+                <div style="flex:1">
+                  <div style="font-weight:700">${l.name}</div>
+                  <div class="text-muted" style="font-size:0.875rem">${l.address || ''}</div>
+                  ${l.setupTime ? `<div style="font-size:0.8125rem;margin-top:4px">🔧 Aufbau: ${l.setupTime}</div>` : ''}
+                  ${l.soundcheck ? `<div style="font-size:0.8125rem">🎤 Soundcheck: ${l.soundcheck}</div>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        ${timeline.length > 0 ? `
+          <div class="card">
+            <h3 style="margin-bottom:var(--space-md);font-size:1rem">📅 Tagesablauf</h3>
+            <div class="timeline">${timeline.map(t => `
+              <div class="timeline-item">
+                <div class="timeline-dot ${t.done ? 'done' : ''}"></div>
+                <div class="timeline-time">${t.time}</div>
+                <div class="timeline-content">
+                  <div class="timeline-title">${t.title}</div>
+                  <div class="timeline-desc">${t.detail || ''}${t.location ? ' · 📍 ' + t.location : ''}${t.duration ? ' · ⏱️ ' + t.duration : ''}</div>
+                </div>
+              </div>
+            `).join('')}</div>
+          </div>
+        ` : ''}
+
+        ${contacts.length > 0 ? `
+          <div class="card">
+            <h3 style="margin-bottom:var(--space-md);font-size:1rem">👥 Kontakte</h3>
+            <div class="grid-2" style="gap:var(--space-sm)">${contacts.map(c => `
+              <div style="padding:var(--space-md);border:1px solid var(--c-border);border-radius:var(--radius-md)">
+                <div style="display:inline-block;background:var(--c-accent);color:white;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:9999px;margin-bottom:6px">${c.role}</div>
+                <div style="font-weight:700">${c.name}</div>
+                ${c.phone ? `<div style="font-size:0.8125rem;color:var(--c-text-2)">📞 ${c.phone}</div>` : ''}
+                ${c.email ? `<div style="font-size:0.8125rem;color:var(--c-text-2)">✉️ ${c.email}</div>` : ''}
+              </div>
+            `).join('')}</div>
+          </div>
+        ` : ''}
+
+        <div class="share-watermark">TLS Event Manager · Freigegeben für ${e.clientName}</div>
+      </div>`;
+    } catch (_) {
+      return `<div class="share-preview">
+        <div class="share-header">
+          <div class="share-brand">TLS Event Manager</div>
+          <div class="share-sub">Ungültiger oder abgelaufener Link.</div>
+        </div>
+      </div>`;
+    }
+  },
+
+  // ═══════════════════════════════════════════════
+  // LOCK SCREEN (App-Passwort)
+  // ═══════════════════════════════════════════════
+  lockScreenHTML() {
+    return `
+    <div class="lock-screen" id="lock-screen">
+      <div class="lock-card">
+        <div class="lock-icon">🔒</div>
+        <div class="lock-title">TLS Event Manager</div>
+        <div class="lock-sub">Gib dein App-Passwort ein.</div>
+        <form id="unlock-form" onsubmit="app.unlock(event)">
+          <input type="password" name="password" placeholder="Passwort" class="form-input" style="text-align:center;margin-bottom:var(--space-md)" autocomplete="off" autofocus>
+          <button type="submit" class="btn btn-primary" style="width:100%">🔓 Entsperren</button>
+        </form>
+      </div>
+    </div>`;
+  },
+
+  async unlock(event) {
+    event.preventDefault();
+    const pw = document.querySelector('#unlock-form input[name=password]').value;
+    const saved = await db.settings.get('appPassword');
+    const current = saved ? saved.value : '';
+
+    if (current === '' || pw === current) {
+      await db.settings.put({ key: 'isLocked', value: false });
+      const ls = document.getElementById('lock-screen');
+      if (ls) ls.remove();
+      UI.toast('Willkommen zurück', 'success');
+    } else {
+      UI.toast('Falsches Passwort', 'danger');
+    }
+  },
+
+  async setPassword() {
+    const fields = [
+      { name: 'newPass', label: 'Neues Passwort', type: 'password', placeholder: 'Leer = kein Passwort' },
+      { name: 'confirmPass', label: 'Wiederholen', type: 'password' }
+    ];
+    UI.openModal('App-Passwort setzen', `<form id="pw-form">${UI.form(fields)}</form>`, async () => {
+      const d = UI.getFormData(document.getElementById('pw-form'));
+      if (d.newPass !== d.confirmPass) { UI.toast('Passwörter stimmen nicht überein', 'danger'); return; }
+      await db.settings.put({ key: 'appPassword', value: d.newPass || '' });
+      await db.settings.put({ key: 'isLocked', value: d.newPass ? false : false });
+      UI.toast(d.newPass ? 'Passwort gespeichert' : 'Passwort entfernt', 'success');
+    });
+  },
+
+  async checkLock() {
+    const locked = await db.settings.get('isLocked');
+    const saved = await db.settings.get('appPassword');
+    const needsLock = saved && saved.value && (locked ? locked.value : true);
+    if (!needsLock) return;
+
+    const existing = document.getElementById('lock-screen');
+    if (existing) return;
+    document.body.insertAdjacentHTML('beforeend', this.lockScreenHTML());
   },
 
   // ═══════════════════════════════════════════════

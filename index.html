@@ -67,6 +67,10 @@
         <i data-lucide="upload"></i>
         <span>Import</span>
       </button>
+      <button class="btn-ghost btn-sm" onclick="app.setPassword()" title="App-Passwort setzen">
+        <i data-lucide="shield"></i>
+        <span>Sicherheit</span>
+      </button>
     </div>
   </aside>
 
@@ -81,7 +85,10 @@
         <input type="text" placeholder="Aufträge, Kontakte, Equipment suchen..." id="global-search">
       </div>
       <div class="topbar-actions">
-        <button class="btn-primary" onclick="app.createEvent()">
+        <button class="btn btn-secondary btn-sm" onclick="app.exportPDF()" title="Als PDF drucken">
+          <i data-lucide="printer"></i>
+        </button>
+        <button class="btn btn-primary" onclick="app.createEvent()">
           <i data-lucide="plus"></i>
           <span>Neuer Auftrag</span>
         </button>
