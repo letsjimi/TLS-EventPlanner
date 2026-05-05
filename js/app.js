@@ -63,7 +63,8 @@ const app = {
       contacts:  () => this.renderContacts(subPage),
       equipment: () => this.renderEquipment(subPage),
       calculation: () => this.renderCalculation(subPage),
-      market:    () => this.renderMarket()
+      market:    () => this.renderMarket(),
+      settings:  () => this.renderSettings()
     };
 
     const renderer = renderers[mainPage] || renderers.dashboard;
@@ -1609,6 +1610,206 @@ const app = {
       }
     };
     input.click();
+  },
+
+  // ═══════════════════════════════════════════════
+  // SETTINGS PAGE
+  // ═══════════════════════════════════════════════
+  async renderSettings() {
+    const eventCount = await db.events.count();
+    const itemCount = await db.equipmentItems.count();
+    const catalogCount = await db.equipmentCatalog.count();
+
+    return `
+      <div class="page-header"><h1 class="page-title">Einstellungen</h1></div>
+
+      <div class="grid-2" style="gap:var(--space-lg)">
+
+        <!-- Backup & Restore -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">💾 Backup & Wiederherstellung</div></div>
+          <p style="color:var(--c-text-2);font-size:0.875rem;margin-bottom:var(--space-md)">
+            Exportiere alle Events, Kontakte, Equipment und Zahlungen als JSON-Datei. Dient als Redundanz falls die Datenbank beschädigt wird.
+          </p>
+          <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="app.exportData()">
+              <i data-lucide="download" style="width:16px;height:16px"></i> Backup exportieren
+            </button>
+            <button class="btn btn-secondary" onclick="app.importData()">
+              <i data-lucide="upload" style="width:16px;height:16px"></i> Wiederherstellen
+            </button>
+          </div>
+          <div style="margin-top:var(--space-md);padding-top:var(--space-md);border-top:1px solid var(--c-border);font-size:0.8125rem;color:var(--c-text-3)">
+            📊 ${eventCount} Events · ${itemCount} Equipment-Items · ${catalogCount} Katalog-Artikel
+          </div>
+        </div>
+
+        <!-- Sicherheit -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">🔒 Sicherheit</div></div>
+          <p style="color:var(--c-text-2);font-size:0.875rem;margin-bottom:var(--space-md)">
+            Setze ein App-Passwort für den Zugriffsschutz. Ohne Passwort ist die App für jeden mit Gerätezugriff einsehbar.
+          </p>
+          <button class="btn btn-secondary" onclick="app.setPassword()">
+            <i data-lucide="lock" style="width:16px;height:16px"></i> Passwort ändern
+          </button>
+        </div>
+
+        <!-- Katalog-Verwaltung -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">📦 Equipment-Katalog</div></div>
+          <p style="color:var(--c-text-2);font-size:0.875rem;margin-bottom:var(--space-md)">
+            Verwalte den zentralen Geräte-Katalog. Artikel hier erscheinen im Katalog-Picker und in den Paketen.
+          </p>
+          <button class="btn btn-secondary" onclick="app.openCatalogEditor()">
+            <i data-lucide="edit" style="width:16px;height:16px"></i> Katalog bearbeiten
+          </button>
+        </div>
+
+        <!-- Datenbank -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">🗑️ Datenbank</div></div>
+          <p style="color:var(--c-text-2);font-size:0.875rem;margin-bottom:var(--space-md)">
+            <span style="color:var(--c-danger)">Achtung:</span> Alle Daten unwiderruflich löschen. Nur nach Backup empfohlen.
+          </p>
+          <button class="btn btn-danger" onclick="app.resetDatabase()">
+            <i data-lucide="trash-2" style="width:16px;height:16px"></i> Alle Daten löschen
+          </button>
+        </div>
+
+      </div>
+    `;
+  },
+
+  /* ── Katalog-Editor (inline, kein Modal) ── */
+  async openCatalogEditor() {
+    const catalog = await db.equipmentCatalog.toArray();
+    const packages = await db.equipmentPackages.toArray();
+
+    const html = `
+      <div class="page-header">
+        <div><h1 class="page-title">📦 Katalog-Verwaltung</h1></div>
+        <button class="btn btn-primary" onclick="app.addCatalogItem()"><i data-lucide="plus" style="width:14px;height:14px"></i> Neues Gerät</button>
+      </div>
+
+      <!-- Geräte -->
+      <h2 style="font-size:1rem;margin:var(--space-lg) 0 var(--space-sm);display:flex;align-items:center;gap:8px">
+        Geräte <span class="badge badge-success" style="font-size:0.7rem">${catalog.length}</span>
+      </h2>
+      <div class="card">
+        <div style="overflow-x:auto">
+          <table class="data-table" style="min-width:600px">
+            <thead><tr>
+              <th>Kategorie</th>
+              <th>Name</th>
+              <th>Einheit</th>
+              <th>€/Tag</th>
+              <th>Tags</th>
+              <th>Herkunft</th>
+              <th style="width:60px"></th>
+            </tr></thead>
+            <tbody>
+              ${catalog.map(item => `
+                <tr>
+                  <td>${item.category}</td>
+                  <td><strong>${item.name}</strong></td>
+                  <td>${item.unit}</td>
+                  <td>${item.priceDay.toFixed(2)}</td>
+                  <td>${(item.tags || []).map(t => `<span class="badge" style="font-size:0.7rem;margin:1px">${t}</span>`).join(' ')}</td>
+                  <td>${item.isExternal ? '<span style="color:var(--c-warning)">🌐 Miete</span>' : '<span style="color:var(--c-success)">TLS Lager</span>'}</td>
+                  <td><button class="btn btn-icon btn-ghost" onclick="app.editCatalogItem(${item.id})"><i data-lucide="pencil" style="width:14px"></i></button></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pakete -->
+      <h2 style="font-size:1rem;margin:var(--space-lg) 0 var(--space-sm);display:flex;align-items:center;gap:8px">
+        Pakete <span class="badge badge-success" style="font-size:0.7rem">${packages.length}</span>
+        <button class="btn btn-sm btn-primary" style="margin-left:auto" onclick="app.addPackageTemplate()"><i data-lucide="plus" style="width:12px;height:12px"></i> Neues Paket</button>
+      </h2>
+      ${packages.map(pkg => `
+        <div class="card mb-2">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:700">${pkg.name}</div>
+              <div style="font-size:0.8125rem;color:var(--c-text-3)">${pkg.description}</div>
+            </div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:50%">
+              ${pkg.tags.map(t => `<span class="badge" style="font-size:0.7rem">${t}</span>`).join(' ')}
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    `;
+
+    document.getElementById('page-content').innerHTML = html;
+    lucide.createIcons();
+  },
+
+  async addCatalogItem() {
+    const fields = [
+      { name: 'category', label: 'Kategorie', placeholder: 'z.B. Mischpult, Lautsprecher' },
+      { name: 'name', label: 'Name', placeholder: 'z.B. Allen & Heath SQ6' },
+      { name: 'unit', label: 'Einheit', placeholder: 'Stk, Set, Paar, Rolle' },
+      { name: 'priceDay', label: 'Preis pro Tag (€)', type: 'number', placeholder: '0' },
+      { name: 'tags', label: 'Tags (kommasepariert)', placeholder: 'PA, Mischpult, Band' },
+      { name: 'isExternal', label: 'Externe Miete?', type: 'checkbox' }
+    ];
+    UI.openModal('Gerät zum Katalog hinzufügen', `<form id="cat-form">${UI.form(fields)}</form>`, async () => {
+      const d = UI.getFormData(document.getElementById('cat-form'));
+      d.priceDay = parseFloat(d.priceDay) || 0;
+      d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      d.isExternal = !!d.isExternal;
+      await db.equipmentCatalog.add(d);
+      UI.toast('Gerät hinzugefügt', 'success');
+      this.openCatalogEditor();
+    });
+  },
+
+  async editCatalogItem(id) {
+    const item = await db.equipmentCatalog.get(id);
+    const fields = [
+      { name: 'category', label: 'Kategorie', value: item.category },
+      { name: 'name', label: 'Name', value: item.name },
+      { name: 'unit', label: 'Einheit', value: item.unit },
+      { name: 'priceDay', label: 'Preis pro Tag (€)', type: 'number', value: item.priceDay },
+      { name: 'tags', label: 'Tags (kommasepariert)', value: (item.tags || []).join(', ') },
+      { name: 'isExternal', label: 'Externe Miete?', type: 'checkbox', value: item.isExternal }
+    ];
+    UI.openModal('Gerät bearbeiten', `<form id="cat-edit-form">${UI.form(fields)}</form>`, async () => {
+      const d = UI.getFormData(document.getElementById('cat-edit-form'));
+      d.priceDay = parseFloat(d.priceDay) || 0;
+      d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      d.isExternal = !!d.isExternal;
+      await db.equipmentCatalog.update(id, d);
+      UI.toast('Gerät aktualisiert', 'success');
+      this.openCatalogEditor();
+    });
+  },
+
+  async addPackageTemplate() {
+    const fields = [
+      { name: 'name', label: 'Paket-Name', placeholder: 'z.B. Band-Komplett' },
+      { name: 'description', label: 'Beschreibung', placeholder: 'Kurzbeschreibung' },
+      { name: 'tags', label: 'Tags (kommasepariert)', placeholder: 'PA, Top, Sub, Mikro, DI' }
+    ];
+    UI.openModal('Neues Paket erstellen', `<form id="pkg-form">${UI.form(fields)}</form>`, async () => {
+      const d = UI.getFormData(document.getElementById('pkg-form'));
+      d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      await db.equipmentPackages.add(d);
+      UI.toast('Paket erstellt', 'success');
+      this.openCatalogEditor();
+    });
+  },
+
+  async resetDatabase() {
+    UI.confirm('<strong>ALLE Daten löschen?</strong><br>Dies kann nicht rückgängig gemacht werden. Bitte vorher ein Backup exportieren!', async () => {
+      await db.delete();
+      location.reload();
+    });
   }
 };
 

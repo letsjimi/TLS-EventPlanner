@@ -1,0 +1,48 @@
+# ───────────────────────────────────────────────
+# TLS Event Manager — Docker Compose
+# 
+# Usage:
+#   docker compose up -d        # Starten
+#   docker compose down          # Stoppen
+#   docker compose logs -f app   # Logs ansehen
+# ───────────────────────────────────────────────
+
+services:
+  app:
+    build: .
+    container_name: tls-eventmanager
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - NGINX_ENTRYPOINT_QUIET_LOGS=1
+    volumes:
+      # Optional: Persistente Backups außerhalb des Containers
+      - ./backups:/usr/share/nginx/html/backups:ro
+    networks:
+      - tls-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Backend-API für Multi-User-Sync (später)
+  # api:
+  #   build: ./backend
+  #   container_name: tls-api
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3001:3000"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - DB_PATH=/data/tls.db
+  #   volumes:
+  #     - ./data:/data
+  #   networks:
+  #     - tls-network
+
+networks:
+  tls-network:
+    driver: bridge
