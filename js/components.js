@@ -77,7 +77,9 @@ const UI = {
   // ── Form Builder ──
   form(fields, values = {}) {
     return fields.map(f => {
-      const val = values[f.name] || '';
+      let val = values[f.name];
+      if (val === undefined || val === null) val = f.value !== undefined ? f.value : '';
+      if (f.type === 'checkbox') val = !!val;
       if (f.type === 'textarea') {
         return `
           <div class="form-group">

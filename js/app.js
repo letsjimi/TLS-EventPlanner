@@ -931,6 +931,7 @@ const app = {
                   <span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">×${item.qty}</span>
                   ${item.note ? `<span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">— ${item.note}</span>` : ''}
                   ${item.source === 'manual' ? `<span style="color:var(--c-warning);font-size:0.75rem;margin-left:6px">✎</span>` : ''}
+                  ${item.sourceVendor || item.isExternal ? `<span style="color:var(--c-accent);font-size:0.75rem;margin-left:6px">${item.isExternal ? '🌐' : '🏢'} ${item.sourceVendor || 'Extern'}</span>` : ''}
                 </label>
                 ${item.needed ? `
                   <input type="checkbox" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)" title="Gepackt">
@@ -1018,6 +1019,8 @@ const app = {
       { name: 'category', label: 'Kategorie', placeholder: 'z.B. Mikrofone, Kabel' },
       { name: 'name', label: 'Bezeichnung', placeholder: 'z.B. Shure SM58' },
       { name: 'qty', label: 'Anzahl', type: 'number', placeholder: '1' },
+      { name: 'isExternal', label: 'Externe Miete?', type: 'checkbox' },
+      { name: 'sourceVendor', label: 'Herkunft / Anbieter', placeholder: 'z.B. Thomann Verleih, StagePro Frankfurt' },
       { name: 'note', label: 'Notiz', placeholder: 'z.B. Batterien prüfen' }
     ];
     UI.openModal('Equipment hinzufügen', `<form id="eq-form">${UI.form(fields)}</form>`, async () => {
@@ -1026,7 +1029,6 @@ const app = {
       data.needed = true;
       data.packed = false;
       data.source = 'manual';
-      data.isExternal = false;
       await db.equipmentItems.add(data);
       UI.toast('Hinzugefügt', 'success');
       this.navigate(`#equipment/${this.currentEventId}`);
@@ -1886,6 +1888,11 @@ const app = {
                     title="${isAdded ? 'Bereits in Packliste' : 'Zur Packliste hinzufügen'}">
                     <i data-lucide="${isAdded ? 'check' : 'plus'}" style="width:22px;height:22px"></i>
                   </button>
+                  <!-- Löschen aus Katalog -->
+                  <button class="btn btn-icon btn-ghost" onclick="event.stopPropagation();app.deleteCatalogPickerItem(${item.id})"
+                    title="Aus Katalog löschen" style="width:32px;height:40px;flex-shrink:0">
+                    <i data-lucide="trash-2" style="width:14px;height:14px;color:var(--c-danger)"></i>
+                  </button>
                 </div>
               `;
             }).join('')}
@@ -1941,6 +1948,16 @@ const app = {
     });
     UI.toast(`${item.name} × ${qty} hinzugefügt`, 'success');
     this.openCatalogPicker();
+  },
+
+  async deleteCatalogPickerItem(catalogId) {
+    const item = await db.equipmentCatalog.get(catalogId);
+    if (!item) return;
+    UI.confirm(`Gerät "${item.name}" aus dem Katalog löschen?\\n\\nDas entfernt es nicht aus bestehenden Events, nur aus dem Katalog.`, async () => {
+      await db.equipmentCatalog.delete(catalogId);
+      UI.toast('Gerät aus Katalog entfernt', 'info');
+      this.openCatalogPicker();
+    });
   },
 
   async resetDatabase() {
