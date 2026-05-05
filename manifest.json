@@ -1,0 +1,14 @@
+{
+  "name": "TLS Event Manager",
+  "short_name": "TLS Event",
+  "description": "Professionelles Event-Planungstool für Veranstaltungstechnik",
+  "start_url": "/TLS-EventPlanner/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "categories": ["productivity", "business"]
+}

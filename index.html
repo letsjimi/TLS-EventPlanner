@@ -2,10 +2,17 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TLS Event">
+  <link rel="apple-touch-icon" href="assets/icon.svg">
+  <link rel="manifest" href="manifest.json">
   <title>TLS Event Manager | Timon Live Sound</title>
   <meta name="description" content="Professionelles Event-Planungstool für Veranstaltungstechnik">
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/mobile.css" media="(max-width:430px), (-webkit-touch-callout: none)">
   <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
@@ -108,6 +115,34 @@
 
   <script src="js/db.js"></script>
   <script src="js/components.js"></script>
+  <script>
+    // ═══ PWA STANDALONE DETECTION ═══
+    if (navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches) {
+      document.body.classList.add('pwa-standalone');
+    }
+    // ═══ SWIPE-GESTURE für Bottom-Sheet Modals ═══
+    let touchStartY = 0;
+    document.addEventListener('touchstart', e => {
+      const m = e.target.closest('.modal');
+      if (m) touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    document.addEventListener('touchmove', e => {
+      const m = e.target.closest('.modal');
+      if (m && touchStartY && e.touches[0].clientY - touchStartY > 120 && e.target.scrollTop <= 0) {
+        m.style.transform = `translateY(${e.touches[0].clientY - touchStartY}px)`;
+        m.style.transition = 'none';
+      }
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const m = e.target.closest('.modal');
+      if (m && touchStartY) {
+        const dy = (e.changedTouches[0].clientY - touchStartY);
+        if (dy > 100) { m.style.transition = ''; UI.closeModal(); }
+        else { m.style.transform = ''; m.style.transition = ''; }
+        touchStartY = 0;
+      }
+    });
+  </script>
   <script src="js/app.js"></script>
 </body>
 </html>

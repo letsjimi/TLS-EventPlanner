@@ -1,0 +1,178 @@
+/* ═══════════════════════════════════════════════
+   CSS iPhone-Optimierung | viewports ≤ 430px wide  
+   ═══════════════════════════════════════════════ */
+
+/* Nur aktiv für echte iPhones + kleine Displays */
+@supports (-webkit-touch-callout: none) or (max-width:430px) {
+
+/* ── Safe Area Insets ───────────────────────── */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 20px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* ── Standalone iOS (PWA) ───────────────────── */
+@supports (background: -apple-named-image(iOS)) or
+          (-webkit-touch-callout: none) {
+  body.pwa-standalone {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body.pwa-standalone .sidebar {
+    padding-top: env(safe-area-inset-top);
+    height: 100vh;
+    height: 100dvh;       /* dvh = dynamisches viewport */
+  }
+  body.pwa-standalone .main {
+    min-height: 100dvh;
+  }
+}
+
+/* ── Basis ──────────────────────────────────── */
+body { -webkit-tap-highlight-color: transparent; }
+input, textarea, select, button { font-size: 16px !important; }
+input::placeholder { color: var(--c-text-3); }
+
+/* ── Sidebar (Bottom Nav) ───────────────────── */
+@media (max-width: 430px) {
+  .sidebar {
+    position: fixed; inset: auto 0 0 0;
+    width: 100%; height: auto;
+    padding: 0 0 env(safe-area-inset-bottom, 20px) 0;
+    flex-direction: row; align-items: center;
+    z-index: 200;
+    border-top: 1px solid var(--c-border);
+    border-right: none;
+  }
+  .sidebar-brand,
+  .sidebar-footer { display: none !important; }
+
+  .sidebar-nav {
+    display: flex; flex-direction: row;
+    justify-content: space-around; align-items: center;
+    width: 100%; gap: 0; padding: 8px 0 12px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+
+  .nav-item {
+    flex: 1; min-width: 64px; max-width: 80px;
+    padding: 4px 0;
+    flex-direction: column; align-items: center;
+    gap: 2px; border-radius: var(--radius-md);
+  }
+  .nav-item span { font-size: 0.625rem; }
+  .nav-item i { width: 20px; height: 20px; }
+  .nav-badge { position: absolute; top: 0; right: 8px; }
+
+  /* ── Main ───────────────────────────────── */
+  .main { margin-left: 0; margin-bottom: calc(60px + var(--safe-bottom)); }
+
+  /* ── Topbar ─────────────────────────────── */
+  .topbar {
+    padding: 0 var(--space-md);
+    gap: var(--space-sm);
+    padding-top: var(--safe-top);
+    z-index: 150;
+  }
+  .topbar .btn-primary span,
+  .topbar .btn-secondary span { display: none; }
+  .topbar .btn-secondary i,
+  .topbar .btn-primary i  { margin: 0; }
+  .topbar-search { max-width: none; flex: 1; }
+  .topbar-search input { font-size: 16px !important; }
+
+  /* ── Page Content ─────────────────────────── */
+  .page-content { padding: var(--space-md); padding-bottom: calc(var(--space-2xl) + var(--safe-bottom)); }
+
+  /* ── Karten ──────────────────────────────── */
+  .grid-2, .grid-3 { grid-template-columns: 1fr; gap: var(--space-sm); }
+  .card { padding: var(--space-md); }
+
+  /* ── Daten-Tabelle ────────────────────────── */
+  .data-table thead { display: none; }
+  .data-table tbody tr {
+    display: flex; flex-direction: column;
+    padding: var(--space-md); gap: 4px;
+    border-bottom: 1px solid var(--c-border);
+    background: var(--c-bg-elev); border-radius: var(--radius-md);
+    margin-bottom: var(--space-sm);
+  }
+  .data-table td { padding: 2px 0; border: none; }
+  .data-table td:first-child { font-weight: 700; font-size: 1rem; color: var(--c-accent); }
+  .data-table td:last-child { align-self: flex-end; }
+
+  /* ── Kanban ───────────────────────────────── */
+  .kanban { flex-direction: column; gap: var(--space-md); overflow-x: visible; }
+  .kanban-col { width: 100%; min-width: 0; }
+
+  /* ── Modals → Bottom Sheets ───────────────── */
+  .modal {
+    position: fixed; inset: auto 0 0 0;
+    transform: translateY(100%);
+    animation: sheetIn 250ms cubic-bezier(.32,.72,0,1) forwards;
+    max-width: 100%; max-height: 90dvh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding-bottom: calc(var(--space-xl) + var(--safe-bottom));
+  }
+  @keyframes sheetIn { to { transform: translateY(0); } }
+  .modal-overlay {
+    opacity: 1; animation: fadeIn 150ms ease;
+  }
+
+  /* Modal Drag-to-Close Handle */
+  .modal::before {
+    content: '';
+    display: block; margin: var(--space-xs) auto var(--space-sm);
+    width: 40px; height: 4px; border-radius: 999px;
+    background: var(--c-border);
+  }
+
+  /* ── Formulare ────────────────────────────── */
+  .form-group { margin-bottom: var(--space-md); }
+  .form-row { flex-direction: column; gap: 0; }
+  .form-label { font-size: 0.8125rem; margin-bottom: 4px; }
+  .form-input, .form-select, .form-textarea {
+    padding: 10px 14px;
+    -webkit-appearance: none; appearance: none;
+  }
+
+  /* ── Timeline ───────────────────────────────── */
+  .timeline::before { left: 12px; }
+  .timeline-item { padding-left: 32px; }
+  .timeline-dot { width: 16px; height: 16px; left: 0; }
+  .timeline-time { font-size: 0.75rem; }
+
+  /* ── Maps Buttons ──────────────────────────── */
+  .maps-row { flex-wrap: wrap; }
+
+  /* ── Share-Link Modal ──────────────────────── */
+  .share-preview { padding: var(--space-md); }
+  .share-header .share-brand { font-size: 1.5rem; }
+
+  /* ── Scrollbar ausblenden ───────────────────── */
+  ::-webkit-scrollbar { display: none; }
+
+  /* ── Touch-Feedback ─────────────────────────── */
+  .btn:active, .nav-item:active, .card:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+    transition: transform 60ms ease, opacity 60ms ease;
+  }
+
+  /* ── Lock-Screen ────────────────────────────── */
+  .lock-card { width: 90%; padding: var(--space-xl); }
+}
+
+/* ── iPhone SE / Mini Optimierung ────────────── */
+@media (max-width: 375px) {
+  .brand-title { font-size: 1rem; }
+  .brand-sub  { font-size: 0.65rem; }
+  .page-title  { font-size: 1.125rem; }
+  .stats-grid  { grid-template-columns: repeat(2, 1fr); }
+}
+
+}
