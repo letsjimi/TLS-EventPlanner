@@ -1,0 +1,195 @@
+/**
+ * TLS Event Manager — IndexedDB Schema (Dexie.js)
+ * Alle Daten client-side, offline-fähig
+ */
+
+const db = new Dexie('TLS_EventManager');
+
+db.version(1).stores({
+  events: '++id, orderNumber, status, eventType, date, clientName, totalPrice',
+  locations: '++id, eventId, sortOrder',
+  contacts: '++id, eventId, role, name',
+  timeline: '++id, eventId, time, sortOrder',
+  equipmentItems: '++id, eventId, category, name, needed',
+  equipmentCatalog: '++id, category, name',
+  payments: '++id, eventId, type, status',
+  settings: 'key'
+});
+
+/* ═══════════════════════════════════════════════
+   SEED DATA (Initial-Daten aus der Excel)
+   ═══════════════════════════════════════════════ */
+
+async function seedDatabase() {
+  const count = await db.events.count();
+  if (count > 0) return; // Nur beim ersten Start
+
+  // ── Events ──
+  await db.events.bulkAdd([
+    {
+      orderNumber: 'TLS-2026-001',
+      date: '2026-06-15',
+      eventType: 'Hochzeit',
+      clientName: 'Schneider & Müller',
+      locations: 'Kirche St. Peter → Festhalle Rüsselsheim',
+      totalPrice: 2850.00,
+      deposit: 850.00,
+      remaining: 2000.00,
+      status: 'confirmed',
+      statusLabel: 'Bestätigt',
+      notes: 'Location-Wechsel! 2x Setup nötig. Braut wünscht sanfte Beleuchtung während Dinner.',
+      duration: 1,
+      km: 90,
+      createdAt: new Date().toISOString()
+    },
+    {
+      orderNumber: 'TLS-2026-002',
+      date: '2026-07-22',
+      eventType: 'Firmenfeier',
+      clientName: 'ABC GmbH Frankfurt',
+      locations: 'Kongresszentrum Frankfurt',
+      totalPrice: 1850.00,
+      deposit: 500.00,
+      remaining: 1350.00,
+      status: 'offer',
+      statusLabel: 'Angebot',
+      notes: 'Catering-Abstimmung offen. Firmenlogo auf LED-Wall gewünscht.',
+      duration: 1,
+      km: 25,
+      createdAt: new Date().toISOString()
+    },
+    {
+      orderNumber: 'TLS-2026-003',
+      date: '2026-08-05',
+      eventType: 'Konzert',
+      clientName: 'Musikverein Darmstadt',
+      locations: 'Jazzclub Darmstadt',
+      totalPrice: 1200.00,
+      deposit: 0,
+      remaining: 1200.00,
+      status: 'inquiry',
+      statusLabel: 'Anfrage',
+      notes: 'Line-In für Band vorhanden. 4-Kanal Mischpult ausreichend.',
+      duration: 1,
+      km: 35,
+      createdAt: new Date().toISOString()
+    }
+  ]);
+
+  // ── Locations (für Event 001) ──
+  await db.locations.bulkAdd([
+    { eventId: 1, sortOrder: 1, name: 'Kirche St. Peter', address: 'Hauptstraße 12, 65428 Rüsselsheim',
+      km: 45, setupTime: '09:00 - 10:00', soundcheck: '10:00 - 10:30',
+      notes: 'Trauung 11:00 Uhr | 2x Drahtlos | nur Beschallung, kein DJ',
+      contactName: 'Pfarrer Müller', contactPhone: '0176/123456' },
+    { eventId: 1, sortOrder: 2, name: 'Festhalle Rüsselsheim', address: 'Am Festplatz 5, 65428 Rüsselsheim',
+      km: 0, setupTime: '14:00 - 16:00', soundcheck: '16:00 - 17:00',
+      notes: 'Empfang ab 17:00 | Dinner 18:00 | Party ab 20:00 | Ende 01:00',
+      contactName: 'Verwalter Schmidt', contactPhone: '06142/98765' }
+  ]);
+
+  // ── Timeline (für Event 001) ──
+  await db.timeline.bulkAdd([
+    { eventId: 1, time: '06:00', title: 'Abfahrt TLS', detail: 'Equipment verladen', location: 'TLS Lager', duration: '1h', crew: 'Techniker + Helfer', done: true },
+    { eventId: 1, time: '07:30', title: 'Ankunft Location 1', detail: 'Kirche St. Peter', location: 'Rüsselsheim', duration: '0,5h', crew: 'Techniker', done: true },
+    { eventId: 1, time: '08:00', title: 'Aufbau Location 1', detail: 'PA aufstellen, Drahtlos-Mikros', location: 'Kirche', duration: '1,5h', crew: 'Techniker + Helfer', done: false },
+    { eventId: 1, time: '09:30', title: 'Soundcheck Kirche', detail: 'Akustik-Check, Rückkopplung', location: 'Kirche', duration: '0,5h', crew: 'Techniker', done: false },
+    { eventId: 1, time: '11:00', title: 'Trauung', detail: 'Beschallung Trauung', location: 'Kirche', duration: '1h', crew: 'Techniker (Standby)', done: false },
+    { eventId: 1, time: '12:30', title: 'Abbau Kirche', detail: 'Equipment einpacken', location: 'Kirche', duration: '1h', crew: 'Techniker + Helfer', done: false },
+    { eventId: 1, time: '14:00', title: 'Aufbau Location 2', detail: 'Festhalle: PA, Licht, DJ-Setup', location: 'Festhalle', duration: '2h', crew: 'Techniker + Helfer', done: false },
+    { eventId: 1, time: '16:00', title: 'Soundcheck Festhalle', detail: 'Full-System Check', location: 'Festhalle', duration: '1h', crew: 'Techniker', done: false },
+    { eventId: 1, time: '17:00', title: 'Empfang', detail: 'Hintergrundmusik', location: 'Festhalle', duration: '1h', crew: 'Techniker', done: false },
+    { eventId: 1, time: '18:00', title: 'Dinner', detail: 'Dinner-Musik / Mikros für Reden', location: 'Festhalle', duration: '2h', crew: 'Techniker', done: false },
+    { eventId: 1, time: '20:00', title: 'Party / DJ', detail: 'Tanzmusik, Moderation', location: 'Festhalle', duration: '5h', crew: 'Techniker', done: false },
+    { eventId: 1, time: '01:00', title: 'Abbau Festhalle', detail: 'Alles einpacken', location: 'Festhalle', duration: '1,5h', crew: 'Techniker + Helfer', done: false },
+    { eventId: 1, time: '03:00', title: 'Rückkehr TLS', detail: 'Equipment abladen', location: 'TLS Lager', duration: '1h', crew: 'Techniker + Helfer', done: false }
+  ]);
+
+  // ── Contacts (für Event 001) ──
+  await db.contacts.bulkAdd([
+    { eventId: 1, role: 'Brautpaar / Kunde', name: 'Lisa Schneider & Tom Müller', phone: '0176/12345678',
+      email: 'hochzeit@mail.de', responsibility: 'Hauptansprech, Vertrag, Zahlung',
+      notes: 'Braut wünscht sanfte Beleuchtung während Dinner', availability: 'Jederzeit' },
+    { eventId: 1, role: 'Location-Kontakt 1', name: 'Pfarrer Müller', phone: '0176/111222',
+      email: 'pfarramt@kirche.de', responsibility: 'Kirchen-Zugang, Aufbau-Zeiten',
+      notes: 'Soundcheck nur nach Absprache', availability: 'Vormittags' },
+    { eventId: 1, role: 'Location-Kontakt 2', name: 'Herr Schmidt (Festhalle)', phone: '06142/987654',
+      email: 'festhalle@ruesselsheim.de', responsibility: 'Schlüssel, Stromanschlüsse, Regeln',
+      notes: '3x Schuko 16A verfügbar | kein Rauchen in der Halle', availability: 'Bürozeiten' },
+    { eventId: 1, role: 'Catering', name: 'Gourmet Events GmbH', phone: '06151/555444',
+      email: 'info@gourmet-events.de', responsibility: 'Menü, Zeiten, Mikros für Reden',
+      notes: 'Buffet 18:30 | Reden während Dinner | 2x Funkmikro', availability: 'Mo-Fr 9-17h' },
+    { eventId: 1, role: 'Fotograf', name: 'Anna Lena Photo', phone: '0176/999888',
+      email: 'anna@lena-photo.de', responsibility: 'Licht für Fotos, First Dance Timing',
+      notes: 'Bitte keine Spot-Effekte während Zeremonie', availability: 'Jederzeit' },
+    { eventId: 1, role: 'Hochzeitsplaner', name: 'Perfect Day Events', phone: '0176/777666',
+      email: 'hello@perfectday.de', responsibility: 'Ablauf-Koordination',
+      notes: 'Sendet finale Timeline 1 Woche vorher', availability: 'Mo-Sa 10-20h' },
+    { eventId: 1, role: 'TLS-Helfer', name: 'Max Mustermann', phone: '0176/444333',
+      email: 'max@mail.de', responsibility: 'Equipment-Transport, Aufbau-Hilfe',
+      notes: 'Hat Führerschein Klasse C1', availability: 'Jederzeit' }
+  ]);
+
+  // ── Equipment Catalog (TLS Lager) ──
+  await db.equipmentCatalog.bulkAdd([
+    { category: 'Mischpult', name: 'Allen & Heath SQ6 + Waves', unit: 'Stk', priceDay: 115 },
+    { category: 'Mischpult', name: 'iPad für SQ-MixPad', unit: 'Stk', priceDay: 0 },
+    { category: 'Lautsprecher', name: 'LD Systems ICOA 12 Pro A (Top)', unit: 'Stk', priceDay: 24 },
+    { category: 'Lautsprecher', name: 'Eigenbau Subwoofer Doppel-18\" 3600W', unit: 'Stk', priceDay: 42.5 },
+    { category: 'Lautsprecher', name: 'Lautsprecher-Ständer', unit: 'Stk', priceDay: 3.5 },
+    { category: 'Mikrofone', name: 'Shure SM58 (Kabel)', unit: 'Stk', priceDay: 3.5 },
+    { category: 'Mikrofone', name: 'Shure SM58 Funkmikrofon-Set', unit: 'Set', priceDay: 25 },
+    { category: 'Mikrofone', name: 'Shure Beta 91A (Kick)', unit: 'Stk', priceDay: 8 },
+    { category: 'Mikrofone', name: 'Shure Beta 57A (Snare)', unit: 'Stk', priceDay: 7 },
+    { category: 'Mikrofone', name: 'Shure PGA98H (Tom)', unit: 'Stk', priceDay: 6 },
+    { category: 'DI-Boxen', name: 'Passive DI-Boxen', unit: 'Stk', priceDay: 3 },
+    { category: 'Licht', name: 'LED Washer RGB (36x)', unit: 'Stk', priceDay: 3 },
+    { category: 'Licht', name: 'Lichtständer / Traversen', unit: 'Stk', priceDay: 5 },
+    { category: 'Licht', name: 'DMX-Controller', unit: 'Set', priceDay: 15 },
+    { category: 'Kabel', name: 'XLR-Kabel (verschiedene Längen)', unit: 'Stk', priceDay: 1 },
+    { category: 'Kabel', name: 'Schuko-Verlängerungen', unit: 'Stk', priceDay: 2 },
+    { category: 'Kabel', name: 'Multicore / Stagebox', unit: 'Set', priceDay: 20 },
+    { category: 'DJ', name: 'DJ-Controller / Laptop', unit: 'Set', priceDay: 0 },
+    { category: 'DJ', name: 'DJ-Booth-Monitore', unit: 'Stk', priceDay: 12 },
+    { category: 'Zubehör', name: 'Gaffa-Tape', unit: 'Rolle', priceDay: 2 },
+    { category: 'Zubehör', name: 'Kabelbinder', unit: 'Pack', priceDay: 1 },
+    { category: 'Zubehör', name: 'Multimeter', unit: 'Stk', priceDay: 2 },
+    { category: 'Zubehör', name: 'Werkzeugkoffer', unit: 'Set', priceDay: 5 },
+    { category: 'Zubehör', name: 'Batterien AA / 9V', unit: 'Pack', priceDay: 3 }
+  ]);
+
+  // ── Equipment Items (für Event 001) ──
+  await db.equipmentItems.bulkAdd([
+    { eventId: 1, category: 'Mischpult', name: 'Allen & Heath SQ6 + Waves', qty: 1, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Mischpult', name: 'iPad für SQ-MixPad', qty: 1, needed: true, packed: false, note: 'WLAN-Router nicht vergessen!' },
+    { eventId: 1, category: 'Lautsprecher', name: 'LD Systems ICOA 12 Pro A (Top)', qty: 2, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Lautsprecher', name: 'Eigenbau Subwoofer Doppel-18\" 3600W', qty: 2, needed: true, packed: false, note: 'Schwer! Kran/2 Personen' },
+    { eventId: 1, category: 'Lautsprecher', name: 'Lautsprecher-Ständer', qty: 4, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure SM58 (Kabel)', qty: 4, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure SM58 Funkmikrofon-Set', qty: 2, needed: true, packed: false, note: 'Batterien prüfen!' },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure Beta 91A (Kick)', qty: 1, needed: true, packed: false, note: 'nur bei Band' },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure Beta 57A (Snare)', qty: 2, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure PGA98H (Tom)', qty: 2, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'DI-Boxen', name: 'Passive DI-Boxen', qty: 4, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Licht', name: 'LED Washer RGB (36x)', qty: 12, needed: true, packed: false, note: 'DMX-Kabel' },
+    { eventId: 1, category: 'Licht', name: 'Lichtständer / Traversen', qty: 4, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Licht', name: 'DMX-Controller', qty: 1, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Kabel', name: 'XLR-Kabel (verschiedene Längen)', qty: 20, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Kabel', name: 'Schuko-Verlängerungen', qty: 6, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Kabel', name: 'Multicore / Stagebox', qty: 1, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'DJ', name: 'DJ-Controller / Laptop', qty: 1, needed: true, packed: false, note: 'Rekordbox / Serato' },
+    { eventId: 1, category: 'DJ', name: 'DJ-Booth-Monitore', qty: 2, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Zubehör', name: 'Gaffa-Tape', qty: 3, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Zubehör', name: 'Kabelbinder', qty: 50, needed: true, packed: false, note: '' },
+    { eventId: 1, category: 'Zubehör', name: 'Batterien AA / 9V', qty: 20, needed: true, packed: false, note: 'Für Funkmikros' }
+  ]);
+
+  // ── Payments (für Event 001) ──
+  await db.payments.bulkAdd([
+    { eventId: 1, type: 'Anzahlung (30%)', dueDate: 'Bei Buchung', amount: 855.00, percent: 30, status: 'offen' },
+    { eventId: 1, type: 'Zwischenzahlung (30%)', dueDate: '2 Wochen vor Event', amount: 855.00, percent: 30, status: 'offen' },
+    { eventId: 1, type: 'Restzahlung (40%)', dueDate: 'Nach Event / am Tag', amount: 1140.00, percent: 40, status: 'offen' }
+  ]);
+
+  console.log('✅ Datenbank initialisiert mit Seed-Daten');
+}

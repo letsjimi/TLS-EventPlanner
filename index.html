@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TLS Event Manager | Timon Live Sound</title>
+  <meta name="description" content="Professionelles Event-Planungstool für Veranstaltungstechnik">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
+          <polyline points="12 22 12 15.5"/>
+          <polyline points="22 8.5 12 15.5 2 8.5"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">TLS</div>
+        <div class="brand-sub">Event Manager</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#dashboard" class="nav-item active" data-page="dashboard">
+        <i data-lucide="layout-dashboard"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="#events" class="nav-item" data-page="events">
+        <i data-lucide="calendar-days"></i>
+        <span>Aufträge</span>
+        <span class="nav-badge" id="nav-events-count">0</span>
+      </a>
+      <a href="#planner" class="nav-item" data-page="planner">
+        <i data-lucide="map-pin"></i>
+        <span>Planung</span>
+      </a>
+      <a href="#contacts" class="nav-item" data-page="contacts">
+        <i data-lucide="users"></i>
+        <span>Kontakte</span>
+      </a>
+      <a href="#equipment" class="nav-item" data-page="equipment">
+        <i data-lucide="package"></i>
+        <span>Equipment</span>
+      </a>
+      <a href="#calculation" class="nav-item" data-page="calculation">
+        <i data-lucide="calculator"></i>
+        <span>Kalkulation</span>
+      </a>
+      <a href="#market" class="nav-item" data-page="market">
+        <i data-lucide="trending-up"></i>
+        <span>Marktpreise</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="btn-ghost btn-sm" onclick="app.exportData()">
+        <i data-lucide="download"></i>
+        <span>Export</span>
+      </button>
+      <button class="btn-ghost btn-sm" onclick="app.importData()">
+        <i data-lucide="upload"></i>
+        <span>Import</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <main id="main" class="main">
+    <header class="topbar">
+      <button class="menu-toggle" id="menu-toggle" aria-label="Menü öffnen">
+        <i data-lucide="menu"></i>
+      </button>
+      <div class="topbar-search">
+        <i data-lucide="search"></i>
+        <input type="text" placeholder="Aufträge, Kontakte, Equipment suchen..." id="global-search">
+      </div>
+      <div class="topbar-actions">
+        <button class="btn-primary" onclick="app.createEvent()">
+          <i data-lucide="plus"></i>
+          <span>Neuer Auftrag</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="page-content" id="page-content">
+      <!-- Pages werden dynamisch injected -->
+    </div>
+  </main>
+
+  <!-- ═══ MODALS ═══ -->
+  <div class="modal-overlay" id="modal-overlay"></div>
+
+  <!-- ═══ TOASTS ═══ -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="js/db.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
