@@ -937,6 +937,18 @@ body {
   .checklist-checkbox { border-color: #888 !important; }
   .checklist-label.checked { text-decoration: line-through; color: #888 !important; }
 
+  /* ── Timeline: Items nicht mitten brechen ── */
+  .timeline-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 4pt;
+  }
+  .timeline::before { background: #ccc !important; }
+  .timeline-dot { border-color: white !important; }
+
+  /* ── Puffer am Seitenende ── */
+  .page-content { padding-bottom: 20pt !important; }
+
   /* ── Orphans / Widows ── */
   p, li { orphans: 3; widows: 3; }
 
