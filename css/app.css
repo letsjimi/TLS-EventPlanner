@@ -842,27 +842,106 @@ body {
    PRINT STYLES (PDF-Export via window.print())
    ═══════════════════════════════════════════════ */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+
   .sidebar, .topbar, .menu-toggle, .btn-ghost,
   .modal-overlay, .modal, .toast-container,
   .btn-primary, .btn-secondary, .btn-icon,
-  .kanban-card .kanban-card-meta span:last-child {
+  .kanban-card .kanban-card-meta span:last-child,
+  #global-search, .maps-row {
     display: none !important;
   }
 
   .main { margin-left: 0 !important; }
-  .page-content { padding: 20px !important; }
+  .page-content { padding: 0 !important; }
 
+  body {
+    background: white !important;
+    color: #222 !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+  }
+
+  /* ── Karten: dürfen umbrechen, aber Inhalt schützt sich ── */
   .card {
-    border: 1px solid #ccc;
+    border: 0.75pt solid #bbb;
+    border-radius: 5pt;
+    padding: 10pt;
+    margin-bottom: 10pt;
+    background: white !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .card-header { background: none !important; }
+  .card-title { color: #222 !important; font-size: 11pt !important; }
+
+  /* ── Überschriften nicht allein am Seitenende ── */
+  h1.page-title, h2, h3, h4 {
+    page-break-after: avoid;
+    break-after: avoid;
+    color: #111 !important;
+  }
+  h1.page-title { font-size: 16pt !important; margin-bottom: 8pt !important; }
+  h2 { font-size: 12pt !important; }
+
+  /* ── Tabellen: Zeilen nicht mitten brechen ── */
+  .data-table { border-collapse: collapse; width: 100%; font-size: 9.5pt; }
+  .data-table th,
+  .data-table td {
+    border: 0.5pt solid #bbb;
+    padding: 5pt 6pt;
+    text-align: left;
+    background: white !important;
+  }
+  .data-table th {
+    background: #f0f0f0 !important;
+    font-weight: 700;
+  }
+  .data-table thead { display: table-header-group; }
+  .data-table tr { break-inside: avoid; page-break-inside: avoid; }
+
+  /* ── Timeline: Items nicht mitten brechen ── */
+  .timeline-item { break-inside: avoid; page-break-inside: avoid; }
+  .timeline::before { background: #ccc !important; }
+  .timeline-dot { border-color: white !important; }
+
+  /* ── Kontakt-Karten / Location-Cards ── */
+  .contact-grid > .card,
+  .locations-grid > .card {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
-  .timeline::before { background: #ccc !important; }
-  .timeline-dot { border-color: white !important; }
+  /* ── Status-Badges: Rahmen statt dunkler Hintergrund ── */
+  .badge {
+    background: none !important;
+    border: 0.5pt solid currentColor !important;
+    padding: 2pt 5pt !important;
+    font-size: 8.5pt !important;
+    color: inherit !important;
+  }
+  .badge-success { border-color: #2e7d32 !important; color: #2e7d32 !important; }
+  .badge-warning { border-color: #ed6c02 !important; color: #ed6c02 !important; }
+  .badge-danger  { border-color: #d32f2f !important; color: #d32f2f !important; }
 
-  body { background: white !important; color: black !important; }
-  .page-title { color: black !important; }
+  /* ── Links ── */
+  a { text-decoration: none !important; color: #222 !important; }
+  a[href^="tel:"]::before { content: '📞 '; }
+  a[href^="mailto:"]::before { content: '✉ '; }
+
+  /* ── Checkliste ── */
+  .checklist-item { break-inside: avoid; page-break-inside: avoid; font-size: 9.5pt; }
+  .checklist-checkbox { border-color: #888 !important; }
+  .checklist-label.checked { text-decoration: line-through; color: #888 !important; }
+
+  /* ── Orphans / Widows ── */
+  p, li { orphans: 3; widows: 3; }
+
+  /* ── Keine Schatten ── */
+  * { box-shadow: none !important; }
 }
 
 /* ═══════════════════════════════════════════════
