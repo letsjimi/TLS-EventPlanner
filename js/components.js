@@ -23,7 +23,7 @@ const UI = {
   },
 
   // ── Modal ──
-  openModal(title, contentHTML, onConfirm = null, confirmText = 'Speichern') {
+  openModal(title, contentHTML, onConfirm = null, confirmText = 'Speichern', noFooter = false) {
     const overlay = document.getElementById('modal-overlay');
     let modal = document.querySelector('.modal');
     if (!modal) {
@@ -40,10 +40,12 @@ const UI = {
         </button>
       </div>
       <div class="modal-body">${contentHTML}</div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="UI.closeModal()">Abbrechen</button>
-        ${onConfirm ? `<button class="btn btn-primary" id="modal-confirm">${confirmText}</button>` : ''}
-      </div>
+      ${noFooter ? '' : `
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="UI.closeModal()">Abbrechen</button>
+          ${onConfirm ? `<button class="btn btn-primary" id="modal-confirm">${confirmText}</button>` : ''}
+        </div>
+      `}
     `;
 
     overlay.classList.add('active');

@@ -3,7 +3,7 @@
  * Alle Daten client-side, offline-fähig
  */
 
-const db = new Dexie('TLS_EventManager');
+const db = new Dexie('TLS_EventManager_v2');
 
 db.version(1).stores({
   events: '++id, orderNumber, status, eventType, date, clientName, totalPrice',
@@ -11,7 +11,8 @@ db.version(1).stores({
   contacts: '++id, eventId, role, name',
   timeline: '++id, eventId, time, sortOrder',
   equipmentItems: '++id, eventId, category, name, needed',
-  equipmentCatalog: '++id, category, name',
+  equipmentCatalog: '++id, category, name, tags, isExternal',
+  equipmentPackages: '++id, name, tags',
   payments: '++id, eventId, type, status',
   settings: 'key'
 });
@@ -132,56 +133,69 @@ async function seedDatabase() {
 
   // ── Equipment Catalog (TLS Lager) ──
   await db.equipmentCatalog.bulkAdd([
-    { category: 'Mischpult', name: 'Allen & Heath SQ6 + Waves', unit: 'Stk', priceDay: 115 },
-    { category: 'Mischpult', name: 'iPad für SQ-MixPad', unit: 'Stk', priceDay: 0 },
-    { category: 'Lautsprecher', name: 'LD Systems ICOA 12 Pro A (Top)', unit: 'Stk', priceDay: 24 },
-    { category: 'Lautsprecher', name: 'Eigenbau Subwoofer Doppel-18\" 3600W', unit: 'Stk', priceDay: 42.5 },
-    { category: 'Lautsprecher', name: 'Lautsprecher-Ständer', unit: 'Stk', priceDay: 3.5 },
-    { category: 'Mikrofone', name: 'Shure SM58 (Kabel)', unit: 'Stk', priceDay: 3.5 },
-    { category: 'Mikrofone', name: 'Shure SM58 Funkmikrofon-Set', unit: 'Set', priceDay: 25 },
-    { category: 'Mikrofone', name: 'Shure Beta 91A (Kick)', unit: 'Stk', priceDay: 8 },
-    { category: 'Mikrofone', name: 'Shure Beta 57A (Snare)', unit: 'Stk', priceDay: 7 },
-    { category: 'Mikrofone', name: 'Shure PGA98H (Tom)', unit: 'Stk', priceDay: 6 },
-    { category: 'DI-Boxen', name: 'Passive DI-Boxen', unit: 'Stk', priceDay: 3 },
-    { category: 'Licht', name: 'LED Washer RGB (36x)', unit: 'Stk', priceDay: 3 },
-    { category: 'Licht', name: 'Lichtständer / Traversen', unit: 'Stk', priceDay: 5 },
-    { category: 'Licht', name: 'DMX-Controller', unit: 'Set', priceDay: 15 },
-    { category: 'Kabel', name: 'XLR-Kabel (verschiedene Längen)', unit: 'Stk', priceDay: 1 },
-    { category: 'Kabel', name: 'Schuko-Verlängerungen', unit: 'Stk', priceDay: 2 },
-    { category: 'Kabel', name: 'Multicore / Stagebox', unit: 'Set', priceDay: 20 },
-    { category: 'DJ', name: 'DJ-Controller / Laptop', unit: 'Set', priceDay: 0 },
-    { category: 'DJ', name: 'DJ-Booth-Monitore', unit: 'Stk', priceDay: 12 },
-    { category: 'Zubehör', name: 'Gaffa-Tape', unit: 'Rolle', priceDay: 2 },
-    { category: 'Zubehör', name: 'Kabelbinder', unit: 'Pack', priceDay: 1 },
-    { category: 'Zubehör', name: 'Multimeter', unit: 'Stk', priceDay: 2 },
-    { category: 'Zubehör', name: 'Werkzeugkoffer', unit: 'Set', priceDay: 5 },
-    { category: 'Zubehör', name: 'Batterien AA / 9V', unit: 'Pack', priceDay: 3 }
+    { category: 'Mischpult', name: 'Allen & Heath SQ6 + Waves', unit: 'Stk', priceDay: 115, tags: ['PA','Mischpult','Band','Hochzeit'], isExternal: false },
+    { category: 'Mischpult', name: 'iPad für SQ-MixPad', unit: 'Stk', priceDay: 0, tags: ['PA','Mischpult','Band','Hochzeit'], isExternal: false },
+    { category: 'Lautsprecher', name: 'LD Systems ICOA 12 Pro A (Top)', unit: 'Stk', priceDay: 24, tags: ['PA','Top','Band','Hochzeit'], isExternal: false },
+    { category: 'Lautsprecher', name: 'Eigenbau Subwoofer Doppel-18\" 3600W', unit: 'Stk', priceDay: 42.5, tags: ['PA','Sub','Band','Hochzeit'], isExternal: false },
+    { category: 'Lautsprecher', name: 'Lautsprecher-Ständer', unit: 'Stk', priceDay: 3.5, tags: ['PA','Top','Stand'], isExternal: false },
+    { category: 'Mikrofone', name: 'Shure SM58 (Kabel)', unit: 'Stk', priceDay: 3.5, tags: ['Mikro','Band','Hochzeit','Rede'], isExternal: false },
+    { category: 'Mikrofone', name: 'Shure SM58 Funkmikrofon-Set', unit: 'Set', priceDay: 25, tags: ['Mikro','Funk','Hochzeit','Rede'], isExternal: false },
+    { category: 'Mikrofone', name: 'Shure Beta 91A (Kick)', unit: 'Stk', priceDay: 8, tags: ['Mikro','Band','Kick'], isExternal: false },
+    { category: 'Mikrofone', name: 'Shure Beta 57A (Snare)', unit: 'Stk', priceDay: 7, tags: ['Mikro','Band','Snare'], isExternal: false },
+    { category: 'Mikrofone', name: 'Shure PGA98H (Tom)', unit: 'Stk', priceDay: 6, tags: ['Mikro','Band','Tom'], isExternal: false },
+    { category: 'DI-Boxen', name: 'Passive DI-Boxen', unit: 'Stk', priceDay: 3, tags: ['DI','Band','Line'], isExternal: false },
+    { category: 'Licht', name: 'LED Washer RGB (36x)', unit: 'Stk', priceDay: 3, tags: ['Licht','LED','Hochzeit'], isExternal: false },
+    { category: 'Licht', name: 'Lichtständer / Traversen', unit: 'Stk', priceDay: 5, tags: ['Licht','Traverse','Hochzeit'], isExternal: false },
+    { category: 'Licht', name: 'DMX-Controller', unit: 'Set', priceDay: 15, tags: ['Licht','DMX','Hochzeit'], isExternal: false },
+    { category: 'Kabel', name: 'XLR-Kabel (verschiedene Längen)', unit: 'Stk', priceDay: 1, tags: ['Kabel','XLR','Band','PA'], isExternal: false },
+    { category: 'Kabel', name: 'Schuko-Verlängerungen', unit: 'Stk', priceDay: 2, tags: ['Kabel','Strom','PA'], isExternal: false },
+    { category: 'Kabel', name: 'Multicore / Stagebox', unit: 'Set', priceDay: 20, tags: ['Kabel','Multicore','Band','PA'], isExternal: false },
+    { category: 'DJ', name: 'DJ-Controller / Laptop', unit: 'Set', priceDay: 0, tags: ['DJ','Laptop','Hochzeit','Party'], isExternal: false },
+    { category: 'DJ', name: 'DJ-Booth-Monitore', unit: 'Stk', priceDay: 12, tags: ['DJ','Monitor','Hochzeit'], isExternal: false },
+    { category: 'Zubehör', name: 'Gaffa-Tape', unit: 'Rolle', priceDay: 2, tags: ['Zubehör','Tape','Kabel'], isExternal: false },
+    { category: 'Zubehör', name: 'Kabelbinder', unit: 'Pack', priceDay: 1, tags: ['Zubehör','Kabel'], isExternal: false },
+    { category: 'Zubehör', name: 'Multimeter', unit: 'Stk', priceDay: 2, tags: ['Zubehör','Werkzeug'], isExternal: false },
+    { category: 'Zubehör', name: 'Werkzeugkoffer', unit: 'Set', priceDay: 5, tags: ['Zubehör','Werkzeug'], isExternal: false },
+    { category: 'Zubehör', name: 'Batterien AA / 9V', unit: 'Pack', priceDay: 3, tags: ['Zubehör','Batterien','Funk'], isExternal: false },
+    // ── Externe Miete ──
+    { category: 'Mischpult', name: 'Behringer X32 (Miete)', unit: 'Stk', priceDay: 85, tags: ['PA','Mischpult','Band','Miete'], isExternal: true },
+    { category: 'Lautsprecher', name: 'dB Technologies ES1203 (Miete)', unit: 'Stk', priceDay: 65, tags: ['PA','Top','Sub','Miete'], isExternal: true },
+    { category: 'Licht', name: 'Moving Head Spot (Miete)', unit: 'Stk', priceDay: 35, tags: ['Licht','Moving','Miete'], isExternal: true }
+  ]);
+
+  // ── Equipment Packages ──
+  await db.equipmentPackages.bulkAdd([
+    { name: 'PA-Anlage', description: 'Komplettsystem mit Tops, Subs, Ständen, Kabel', tags: ['PA','Top','Sub','Stand','Kabel'] },
+    { name: 'DJ-Setup', description: 'DJ-Pult + Monitore + Laptop', tags: ['DJ','Monitor','Laptop'] },
+    { name: 'Band-Schlagzeug', description: 'Kick-Mikro + Snare-Mikro + Tom-Mikros + DI', tags: ['Kick','Snare','Tom','DI'] },
+    { name: 'Hochzeit-Basic', description: 'PA + Funkmikros + Licht Grundausstattung', tags: ['PA','Funk','Licht','LED'] },
+    { name: 'Band-Komplett', description: 'Full-Band-Setup mit Mischpult, PA, Mikros, DI', tags: ['PA','Mischpult','Top','Sub','Mikro','DI','Band'] }
   ]);
 
   // ── Equipment Items (für Event 001) ──
   await db.equipmentItems.bulkAdd([
-    { eventId: 1, category: 'Mischpult', name: 'Allen & Heath SQ6 + Waves', qty: 1, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Mischpult', name: 'iPad für SQ-MixPad', qty: 1, needed: true, packed: false, note: 'WLAN-Router nicht vergessen!' },
-    { eventId: 1, category: 'Lautsprecher', name: 'LD Systems ICOA 12 Pro A (Top)', qty: 2, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Lautsprecher', name: 'Eigenbau Subwoofer Doppel-18\" 3600W', qty: 2, needed: true, packed: false, note: 'Schwer! Kran/2 Personen' },
-    { eventId: 1, category: 'Lautsprecher', name: 'Lautsprecher-Ständer', qty: 4, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Mikrofone', name: 'Shure SM58 (Kabel)', qty: 4, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Mikrofone', name: 'Shure SM58 Funkmikrofon-Set', qty: 2, needed: true, packed: false, note: 'Batterien prüfen!' },
-    { eventId: 1, category: 'Mikrofone', name: 'Shure Beta 91A (Kick)', qty: 1, needed: true, packed: false, note: 'nur bei Band' },
-    { eventId: 1, category: 'Mikrofone', name: 'Shure Beta 57A (Snare)', qty: 2, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Mikrofone', name: 'Shure PGA98H (Tom)', qty: 2, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'DI-Boxen', name: 'Passive DI-Boxen', qty: 4, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Licht', name: 'LED Washer RGB (36x)', qty: 12, needed: true, packed: false, note: 'DMX-Kabel' },
-    { eventId: 1, category: 'Licht', name: 'Lichtständer / Traversen', qty: 4, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Licht', name: 'DMX-Controller', qty: 1, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Kabel', name: 'XLR-Kabel (verschiedene Längen)', qty: 20, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Kabel', name: 'Schuko-Verlängerungen', qty: 6, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Kabel', name: 'Multicore / Stagebox', qty: 1, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'DJ', name: 'DJ-Controller / Laptop', qty: 1, needed: true, packed: false, note: 'Rekordbox / Serato' },
-    { eventId: 1, category: 'DJ', name: 'DJ-Booth-Monitore', qty: 2, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Zubehör', name: 'Gaffa-Tape', qty: 3, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Zubehör', name: 'Kabelbinder', qty: 50, needed: true, packed: false, note: '' },
-    { eventId: 1, category: 'Zubehör', name: 'Batterien AA / 9V', qty: 20, needed: true, packed: false, note: 'Für Funkmikros' }
+    { eventId: 1, category: 'Mischpult', name: 'Allen & Heath SQ6 + Waves', qty: 1, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 115 },
+    { eventId: 1, category: 'Mischpult', name: 'iPad für SQ-MixPad', qty: 1, needed: true, packed: false, note: 'WLAN-Router nicht vergessen!', source: 'catalog', isExternal: false, priceDay: 0 },
+    { eventId: 1, category: 'Lautsprecher', name: 'LD Systems ICOA 12 Pro A (Top)', qty: 2, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 24 },
+    { eventId: 1, category: 'Lautsprecher', name: 'Eigenbau Subwoofer Doppel-18\" 3600W', qty: 2, needed: true, packed: false, note: 'Schwer! Kran/2 Personen', source: 'catalog', isExternal: false, priceDay: 42.5 },
+    { eventId: 1, category: 'Lautsprecher', name: 'Lautsprecher-Ständer', qty: 4, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 3.5 },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure SM58 (Kabel)', qty: 4, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 3.5 },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure SM58 Funkmikrofon-Set', qty: 2, needed: true, packed: false, note: 'Batterien prüfen!', source: 'catalog', isExternal: false, priceDay: 25 },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure Beta 91A (Kick)', qty: 1, needed: true, packed: false, note: 'nur bei Band', source: 'catalog', isExternal: false, priceDay: 8 },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure Beta 57A (Snare)', qty: 2, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 7 },
+    { eventId: 1, category: 'Mikrofone', name: 'Shure PGA98H (Tom)', qty: 2, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 6 },
+    { eventId: 1, category: 'DI-Boxen', name: 'Passive DI-Boxen', qty: 4, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 3 },
+    { eventId: 1, category: 'Licht', name: 'LED Washer RGB (36x)', qty: 12, needed: true, packed: false, note: 'DMX-Kabel', source: 'catalog', isExternal: false, priceDay: 3 },
+    { eventId: 1, category: 'Licht', name: 'Lichtständer / Traversen', qty: 4, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 5 },
+    { eventId: 1, category: 'Licht', name: 'DMX-Controller', qty: 1, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 15 },
+    { eventId: 1, category: 'Kabel', name: 'XLR-Kabel (verschiedene Längen)', qty: 20, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 1 },
+    { eventId: 1, category: 'Kabel', name: 'Schuko-Verlängerungen', qty: 6, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 2 },
+    { eventId: 1, category: 'Kabel', name: 'Multicore / Stagebox', qty: 1, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 20 },
+    { eventId: 1, category: 'DJ', name: 'DJ-Controller / Laptop', qty: 1, needed: true, packed: false, note: 'Rekordbox / Serato', source: 'catalog', isExternal: false, priceDay: 0 },
+    { eventId: 1, category: 'DJ', name: 'DJ-Booth-Monitore', qty: 2, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 12 },
+    { eventId: 1, category: 'Zubehör', name: 'Gaffa-Tape', qty: 3, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 2 },
+    { eventId: 1, category: 'Zubehör', name: 'Kabelbinder', qty: 50, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 1 },
+    { eventId: 1, category: 'Zubehör', name: 'Batterien AA / 9V', qty: 20, needed: true, packed: false, note: 'Für Funkmikros', source: 'catalog', isExternal: false, priceDay: 3 }
   ]);
 
   // ── Payments (für Event 001) ──

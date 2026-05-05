@@ -881,7 +881,6 @@ const app = {
     this.currentEventId = parseInt(eventId);
     const e = await db.events.get(this.currentEventId);
     let items = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
-    const catalog = await db.equipmentCatalog.toArray();
 
     if (search) {
       items = items.filter(i =>
@@ -890,16 +889,56 @@ const app = {
       );
     }
 
-    // Group by category
-    const byCat = {};
-    items.forEach(item => {
-      if (!byCat[item.category]) byCat[item.category] = [];
-      byCat[item.category].push(item);
-    });
+    // Gruppiere nach Herkunft
+    const ownItems = items.filter(i => !i.isExternal);
+    const extItems = items.filter(i => i.isExternal);
+
+    const groupByCat = arr => {
+      const byCat = {};
+      arr.forEach(item => {
+        if (!byCat[item.category]) byCat[item.category] = [];
+        byCat[item.category].push(item);
+      });
+      return byCat;
+    };
+    const byCatOwn = groupByCat(ownItems);
+    const byCatExt = groupByCat(extItems);
 
     const totalNeeded = items.filter(i => i.needed).length;
     const totalPacked = items.filter(i => i.needed && i.packed).length;
     const progress = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
+
+    // Pakete laden
+    const packages = await db.equipmentPackages.toArray();
+
+    const renderCatBlock = (byCat, title, badgeColor) => {
+      if (Object.keys(byCat).length === 0) return '';
+      return `
+        <h3 style="font-size:1rem;margin:var(--space-lg) 0 var(--space-sm);display:flex;align-items:center;gap:8px">
+          ${title}
+          <span class="badge" style="background:${badgeColor};color:white;font-size:0.7rem">${Object.values(byCat).flat().length}</span>
+        </h3>
+        ${Object.keys(byCat).sort().map(cat => `
+          <div class="card mb-2">
+            <div class="card-header"><div class="card-title">${cat}</div></div>
+            ${byCat[cat].map(item => `
+              <div class="checklist-item">
+                <input type="checkbox" class="checklist-checkbox" ${item.needed ? 'checked' : ''} onchange="app.toggleEquipmentNeeded(${item.id}, this.checked)">
+                <label class="checklist-label ${item.needed ? '' : 'checked'}">
+                  <span style="font-weight:600">${item.name}</span>
+                  <span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">×${item.qty}</span>
+                  ${item.note ? `<span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">— ${item.note}</span>` : ''}
+                  ${item.source === 'manual' ? `<span style="color:var(--c-warning);font-size:0.75rem;margin-left:6px">✎</span>` : ''}
+                </label>
+                ${item.needed ? `
+                  <input type="checkbox" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)" title="Gepackt">
+                ` : ''}
+                <button class="btn btn-icon btn-ghost" onclick="app.deleteEquipmentItem(${item.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}`;
+    };
 
     return `
       <div class="page-header">
@@ -926,34 +965,26 @@ const app = {
         </div>
       </div>
 
-      <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-md)">
-        <button class="btn btn-sm btn-primary" onclick="app.addEquipmentItem()"><i data-lucide="plus" style="width:14px;height:14px"></i>Hinzufügen</button>
-        <button class="btn btn-sm btn-secondary" onclick="app.autoFillEquipment()">📋 Aus Katalog</button>
+      <!-- Pakete & Aktionen -->
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-bottom:var(--space-md);align-items:center">
+        <button class="btn btn-sm btn-primary" onclick="app.addEquipmentItem()"><i data-lucide="plus" style="width:14px;height:14px"></i>Manuell</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.openCatalogPicker()">📦 Katalog</button>
+        <div style="width:1px;height:24px;background:var(--c-border);margin:0 4px"></div>
+        ${packages.map(pkg => `
+          <button class="btn btn-sm btn-ghost" style="border:1px dashed var(--c-border)" onclick="app.addPackage('${pkg.name}')" title="${pkg.description}">
+            + ${pkg.name}
+          </button>
+        `).join('')}
       </div>
 
-      ${Object.keys(byCat).length === 0 ? UI.emptyState('package', 'Kein Equipment', 'Füge Equipment hinzu oder nutze den Katalog.') :
-        Object.keys(byCat).sort().map(cat => `
-          <div class="card mb-2">
-            <div class="card-header">
-              <div class="card-title">${cat}</div>
-            </div>
-            ${byCat[cat].map(item => `
-              <div class="checklist-item">
-                <input type="checkbox" class="checklist-checkbox" ${item.needed ? 'checked' : ''} onchange="app.toggleEquipmentNeeded(${item.id}, this.checked)">
-                <label class="checklist-label ${item.needed ? '' : 'checked'}">
-                  <span style="font-weight:600">${item.name}</span>
-                  <span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">×${item.qty}</span>
-                  ${item.note ? `<span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">— ${item.note}</span>` : ''}
-                </label>
-                ${item.needed ? `
-                  <input type="checkbox" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)"
-                  title="Gepackt">
-                ` : ''}
-                <button class="btn btn-icon btn-ghost" onclick="app.deleteEquipmentItem(${item.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
-              </div>
-            `).join('')}
-          </div>
-        `).join('')}
+      <!-- Eigene Geräte -->
+      ${renderCatBlock(byCatOwn, '🔧 Eigene Geräte (TLS Lager)', 'var(--c-success)')}
+
+      <!-- Externe Miete -->
+      ${renderCatBlock(byCatExt, '📤 Externe Miete', 'var(--c-warning)')}
+
+      <!-- Leer -->
+      ${items.length === 0 ? UI.emptyState('package', 'Kein Equipment', 'Füge manuell hinzu, wähle aus dem Katalog oder klicke ein Paket oben.') : ''}
     `;
   },
 
@@ -976,27 +1007,8 @@ const app = {
   },
 
   async autoFillEquipment() {
-    const catalog = await db.equipmentCatalog.toArray();
-    const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
-    const existingNames = new Set(existing.map(e => e.name));
-
-    let added = 0;
-    for (const item of catalog) {
-      if (!existingNames.has(item.name)) {
-        await db.equipmentItems.add({
-          eventId: this.currentEventId,
-          category: item.category,
-          name: item.name,
-          qty: 1,
-          needed: true,
-          packed: false,
-          note: ''
-        });
-        added++;
-      }
-    }
-    UI.toast(`${added} Positionen aus Katalog hinzugefügt`, 'success');
-    this.navigate(`#equipment/${this.currentEventId}`);
+    // Veraltet — jetzt über openCatalogPicker()
+    this.openCatalogPicker();
   },
 
   addEquipmentItem() {
@@ -1011,10 +1023,115 @@ const app = {
       data.eventId = this.currentEventId;
       data.needed = true;
       data.packed = false;
+      data.source = 'manual';
+      data.isExternal = false;
       await db.equipmentItems.add(data);
       UI.toast('Hinzugefügt', 'success');
       this.navigate(`#equipment/${this.currentEventId}`);
     });
+  },
+
+  /* ── Katalog-Picker ── */
+  async openCatalogPicker() {
+    const catalog = await db.equipmentCatalog.toArray();
+    const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
+    const existingNames = new Set(existing.map(e => e.name));
+
+    // Gruppiere nach Kategorie
+    const byCat = {};
+    catalog.forEach(item => {
+      if (!byCat[item.category]) byCat[item.category] = [];
+      byCat[item.category].push(item);
+    });
+
+    const html = `
+      <div style="max-height:60vh;overflow-y:auto">
+        ${Object.keys(byCat).sort().map(cat => `
+          <div style="margin-bottom:var(--space-md)">
+            <h4 style="font-size:0.875rem;color:var(--c-text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">${cat}</h4>
+            ${byCat[cat].map(item => {
+              const isAdded = existingNames.has(item.name);
+              const extBadge = item.isExternal ? `<span style="color:var(--c-warning);font-size:0.75rem;margin-left:6px">🌐 Miete</span>` : '';
+              const tagStr = item.tags ? item.tags.slice(0, 3).map(t => `<span style="background:var(--c-bg);padding:1px 5px;border-radius:3px;font-size:0.7rem;margin-left:4px">${t}</span>`).join('') : '';
+              return `
+                <div style="display:flex;align-items:center;gap:var(--space-sm);padding:6px 8px;border-radius:var(--radius-sm);${isAdded ? 'opacity:0.4' : 'background:var(--c-bg-elev)'}>
+                  <button class="btn btn-sm btn-primary" ${isAdded ? 'disabled' : `onclick="app.addFromCatalog(${item.id})"`} style="flex-shrink:0"><i data-lucide="plus" style="width:12px;height:12px"></i></button>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;font-size:0.875rem">${item.name}${extBadge}</div>
+                    <div style="font-size:0.75rem;color:var(--c-text-3);display:flex;align-items:center;flex-wrap:wrap;gap:2px">${item.unit} · ${item.priceDay} €/Tag${tagStr}</div>
+                  </div>
+                  ${isAdded ? '<span style="font-size:0.75rem;color:var(--c-success)">✓</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `).join('')}
+      </div>
+    `;
+    UI.openModal('📦 Aus Katalog hinzufügen', html, null, true);
+    lucide.createIcons();
+  },
+
+  async addFromCatalog(catalogId) {
+    const item = await db.equipmentCatalog.get(catalogId);
+    const existing = await db.equipmentItems.where({ eventId: this.currentEventId, name: item.name }).first();
+    if (existing) {
+      UI.toast('Bereits in der Liste', 'warning');
+      return;
+    }
+    await db.equipmentItems.add({
+      eventId: this.currentEventId,
+      category: item.category,
+      name: item.name,
+      qty: 1,
+      needed: true,
+      packed: false,
+      note: '',
+      source: 'catalog',
+      isExternal: !!item.isExternal,
+      priceDay: item.priceDay || 0
+    });
+    UI.toast(`${item.name} hinzugefügt`, 'success');
+    // Re-render picker
+    this.openCatalogPicker();
+  },
+
+  /* ── Pakete hinzufügen ── */
+  async addPackage(packageName) {
+    const pkg = await db.equipmentPackages.where('name').equals(packageName).first();
+    if (!pkg) return;
+
+    const catalog = await db.equipmentCatalog.toArray();
+    const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
+    const existingNames = new Set(existing.map(e => e.name));
+
+    // Finde alle Katalog-Items, deren Tags mit dem Paket übereinstimmen
+    const pkgTags = new Set(pkg.tags);
+    const matches = catalog.filter(item =>
+      item.tags && item.tags.some(tag => pkgTags.has(tag))
+    );
+
+    let added = 0;
+    for (const item of matches) {
+      if (!existingNames.has(item.name)) {
+        await db.equipmentItems.add({
+          eventId: this.currentEventId,
+          category: item.category,
+          name: item.name,
+          qty: 1,
+          needed: true,
+          packed: false,
+          note: `Paket: ${pkg.name}`,
+          source: 'package',
+          isExternal: !!item.isExternal,
+          priceDay: item.priceDay || 0
+        });
+        added++;
+      }
+    }
+
+    UI.toast(`${added} Positionen aus "${pkg.name}" hinzugefügt`, 'success');
+    this.navigate(`#equipment/${this.currentEventId}`);
   },
 
   // ═══════════════════════════════════════════════
