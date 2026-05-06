@@ -875,8 +875,15 @@ body {
   }
 
   /* ── Layout zurücksetzen ── */
-  .main { margin-left: 0 !important; margin-bottom: 0 !important; }
-  .page-content { padding: 0 !important; }
+  .main {
+    margin-left: 0 !important;
+    margin-bottom: 0 !important;
+    background: white !important;
+  }
+  .page-content {
+    padding: 0 !important;
+    background: white !important;
+  }
 
   /* ── Seite: Weißer Hintergrund, schwarzer Text ── */
   html, body {

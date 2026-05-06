@@ -296,3 +296,20 @@ body.pwa-standalone .main {
   .page-title  { font-size: 1.125rem; }
   .stats-grid  { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── PRINT: Weißer Hintergrund auch auf Mobile ── */
+@media print {
+  html, body, .main, .page-content, .card {
+    background: white !important;
+    color: #222 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .sidebar, .topbar, .sidebar-footer, .menu-toggle, .btn-ghost,
+  .modal-overlay, .modal::before, .toast-container,
+  .sidebar-overlay, .lock-screen {
+    display: none !important;
+  }
+  .main { margin-left: 0 !important; margin-bottom: 0 !important; }
+  .page-content { padding: 0 !important; }
+}
