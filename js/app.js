@@ -65,6 +65,7 @@ const app = {
       catalog:   () => this.openCatalogEditorFromNav(),
       calculation: () => this.renderCalculation(subPage),
       market:    () => this.renderMarket(),
+      calendar:  () => this.showAvailabilityCalendar(),
       settings:  () => this.renderSettings()
     };
 
@@ -2034,6 +2035,259 @@ const app = {
     await db.events.update(id, { status, statusLabel: statusLabel[status] });
     UI.toast(`Status: ${statusLabel[status]}`, 'success');
     this.navigate(`#planner/${id}`);
+  },
+
+  // ═══════════════════════════════════════════════
+  // EVENT TODOS
+  // ═══════════════════════════════════════════════
+  async renderEventTodos(eventId) {
+    const todos = await db.eventTodos.where('eventId').equals(eventId).sortBy('dueDate');
+    const items = todos.map(t => {
+      const overdue = t.dueDate && t.dueDate < new Date().toISOString().slice(0,10) && !t.done;
+      return `
+        <div class="todo-item ${t.done ? 'done' : ''} ${overdue ? 'overdue' : ''}" style="display:flex;align-items:center;gap:var(--space-sm);padding:var(--space-sm);border-radius:var(--radius-md);background:var(--c-bg-2);margin-bottom:6px">
+          <input type="checkbox" ${t.done ? 'checked' : ''} onchange="app.toggleEventTodo(${t.id})" style="width:18px;height:18px;cursor:pointer;flex-shrink:0">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:500;${t.done ? 'text-decoration:line-through;color:var(--c-text-3)' : ''}">${t.title}</div>
+            ${t.dueDate ? `<div style="font-size:0.75rem;color:${overdue ? 'var(--c-danger)' : 'var(--c-text-3)'}" class="todo-due">${overdue ? '⚠️ ' : '📅 '}${UI.formatDate(t.dueDate)}</div>` : ''}
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="app.deleteEventTodo(${t.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="card mb-3">
+        <div class="card-header">
+          <div class="card-title"><i data-lucide="check-square"></i>TODOs</div>
+          <button class="btn btn-sm btn-primary" onclick="app.addEventTodo()"><i data-lucide="plus" style="width:14px;height:14px"></i>Neu</button>
+        </div>
+        <div class="todo-list">${items || UI.emptyState('check-square', 'Keine TODOs', 'Füge deine erste Aufgabe hinzu.')}</div>
+      </div>`;
+  },
+
+  async addEventTodo() {
+    UI.formModal('Neues TODO', [
+      { name: 'title', label: 'Aufgabe', required: true },
+      { name: 'dueDate', label: 'Fällig bis', type: 'date' }
+    ], {}, async (vals) => {
+      await db.eventTodos.add({
+        eventId: this.currentEventId,
+        title: vals.title,
+        dueDate: vals.dueDate || '',
+        done: false
+      });
+      UI.toast('TODO hinzugefügt', 'success');
+      this.navigate(`#planner/${this.currentEventId}`);
+    });
+  },
+
+  async toggleEventTodo(id) {
+    const t = await db.eventTodos.get(id);
+    if (!t) return;
+    await db.eventTodos.update(id, { done: !t.done });
+    this.navigate(`#planner/${this.currentEventId}`);
+  },
+
+  async deleteEventTodo(id) {
+    UI.confirm('TODO löschen?', async () => {
+      await db.eventTodos.delete(id);
+      UI.toast('TODO gelöscht', 'info');
+      this.navigate(`#planner/${this.currentEventId}`);
+    });
+  },
+
+  // ═══════════════════════════════════════════════
+  // ANGEBOTS-PDF (§19 UStG)
+  // ═══════════════════════════════════════════════
+  async generateOfferPDF(eventId) {
+    const e = await db.events.get(eventId);
+    if (!e) return;
+    const items = await db.equipmentItems.where('eventId').equals(eventId).toArray();
+    const total = items.reduce((s, i) => s + (i.qty || 1) * (i.priceDay || 0), 0);
+
+    const printHtml = `
+      <div style="max-width:700px;margin:0 auto;padding:40px;font-family:system-ui,sans-serif;color:#111;background:#fff">
+        <div style="text-align:center;margin-bottom:24px">
+          <h1 style="margin:0 0 4px 0;font-size:1.6rem">Timon Live Sound</h1>
+          <p style="margin:0;color:#555">Event-Technik &amp; Veranstaltungsservice</p>
+        </div>
+        <h2 style="font-size:1.2rem;border-bottom:1px solid #ddd;padding-bottom:8px;margin:20px 0 12px 0">Angebot ${e.orderNumber || ''}</h2>
+        <p><strong>Kunde:</strong> ${e.clientName || ''}<br>
+        <strong>Veranstaltung:</strong> ${e.eventType || ''}<br>
+        <strong>Datum:</strong> ${e.date ? UI.formatDate(e.date) : '-'}<br>
+        <strong>Location:</strong> ${e.locations || '-'}</p>
+
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:0.9rem">
+          <thead><tr style="border-bottom:1px solid #ccc">
+            <th style="text-align:left;padding:6px 0">Pos</th>
+            <th style="text-align:left;padding:6px 0">Bezeichnung</th>
+            <th style="text-align:center;padding:6px 0">Menge</th>
+            <th style="text-align:right;padding:6px 0">Tagessatz</th>
+            <th style="text-align:right;padding:6px 0">Gesamt</th>
+          </tr></thead>
+          <tbody>
+            ${items.map((it, idx) => `
+              <tr style="border-bottom:1px solid #eee">
+                <td style="padding:5px 0">${idx + 1}</td>
+                <td style="padding:5px 0">${it.name}</td>
+                <td style="text-align:center;padding:5px 0">${it.qty || 1}</td>
+                <td style="text-align:right;padding:5px 0">${(it.priceDay || 0).toFixed(2).replace('.', ',')} €</td>
+                <td style="text-align:right;padding:5px 0">${((it.qty || 1) * (it.priceDay || 0)).toFixed(2).replace('.', ',')} €</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div style="text-align:right;font-size:1.05rem;font-weight:700;margin-top:16px">
+          Summe: ${total.toFixed(2).replace('.', ',')} €
+        </div>
+        <div style="margin-top:6px;font-size:0.85rem;color:#555">
+          <em>Gemäß §19 Abs. 1 UStG wird keine Umsatzsteuer ausgewiesen (Kleinunternehmer).</em>
+        </div>
+
+        <div style="margin-top:32px;font-size:0.8rem;color:#555">
+          <p>Dieses Angebot ist 14 Tage gültig.<br>
+          TLS — Timon Live Sound | timon@tls-livesound.de | +49 176 12345678</p>
+        </div>
+      </div>`;
+
+    const original = document.getElementById('page-content').innerHTML;
+    document.getElementById('page-content').innerHTML = `<div class="print-only-content">${printHtml}</div>`;
+    window.print();
+    document.getElementById('page-content').innerHTML = original;
+    lucide.createIcons();
+    this.navigate(`#planner/${eventId}`);
+  },
+
+  // ═══════════════════════════════════════════════
+  // E-MAIL VERSAND
+  // ═══════════════════════════════════════════════
+  async sendEventEmail(eventId) {
+    const e = await db.events.get(eventId);
+    if (!e) return;
+    const items = await db.equipmentItems.where('eventId').equals(eventId).toArray();
+    const total = items.reduce((s, i) => s + (i.qty || 1) * (i.priceDay || 0), 0);
+
+    const equipmentList = items.map(it => `• ${it.name} × ${it.qty || 1}`).join('\n');
+    const subject = `Angebot ${e.orderNumber || ''} — ${e.eventType || ''} am ${e.date || ''}`;
+    const body = `Hallo ${e.clientName || ''},\n\n` +
+      `vielen Dank für deine Anfrage! Gerne unterbreite ich dir folgendes Angebot:\n\n` +
+      `📅 Veranstaltung: ${e.eventType || ''}\n` +
+      `📍 Location: ${e.locations || '-'}\n` +
+      `💰 Gesamtskosten: ${total.toFixed(2).replace('.', ',')} € (netto, §19 UStG)\n\n` +
+      `Equipment:\n${equipmentList || '(noch kein Equipment ausgewählt)'}\n\n` +
+      `Bei Fragen erreichst du mich jederzeit unter +49 176 12345678 oder per Antwort auf diese E-Mail.\n\n` +
+      `Freundliche Grüße\nTimon | TLS Live Sound`;
+
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  },
+
+  // ═══════════════════════════════════════════════
+  // VERFÜGBARKEITSKALENDER
+  // ═══════════════════════════════════════════════
+  async showAvailabilityCalendar(year = new Date().getFullYear(), month = new Date().getMonth()) {
+    const startOfMonth = new Date(year, month, 1);
+    const endOfMonth = new Date(year, month + 1, 0);
+    const daysInMonth = endOfMonth.getDate();
+    const firstDay = startOfMonth.getDay(); // 0=Su, 1=Mo...
+
+    // Events laden
+    const allEvents = await db.events.toArray();
+    const eventsInMonth = allEvents.filter(ev => {
+      const d = new Date(ev.date + 'T00:00:00');
+      return d.getFullYear() === year && d.getMonth() === month;
+    });
+
+    const calendarDays = [];
+    // Leere Tage im Vormonat
+    for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) calendarDays.push(`<div class="cal-day empty"></div>`);
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayEvents = eventsInMonth.filter(ev => new Date(ev.date + 'T00:00:00').getDate() === d);
+      const eventDots = dayEvents.map(ev => {
+        const color = { inquiry:'#3b82f6', offer:'#eab308', inspected:'#a855f7', confirmed:'#22c55e', paid:'#0ea5e9', done:'#64748b', cancelled:'#ef4444' }[ev.status] || '#9ca3af';
+        return `<span class="cal-dot" style="background:${color}" title="${ev.clientName} (${ev.status})"></span>`;
+      }).join('');
+      const isToday = new Date().toISOString().slice(0,10) === new Date(year, month, d).toISOString().slice(0,10);
+      calendarDays.push(`
+        <div class="cal-day ${isToday ? 'today' : ''}" onclick="app.showDayEvents(${year},${month},${d})">
+          <span style="font-size:0.75rem;font-weight:600;color:var(--c-text-2)">${d}</span>
+          <div style="display:flex;gap:2px;flex-wrap:wrap;margin-top:3px;justify-content:center">${eventDots}</div>
+        </div>`);
+    }
+
+    const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+    const html = `
+      <div class="page-header" style="flex-wrap:wrap;gap:var(--space-sm)">
+        <div><h1 class="page-title">Verfügbarkeitskalender</h1><p class="page-subtitle">Auftragsübersicht</p></div>
+        <div style="display:flex;gap:var(--space-sm);align-items:center">
+          <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${year},${month - 1})">◀</button>
+          <span style="font-weight:600">${monthNames[month]} ${year}</span>
+          <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${year},${month + 1})">▶</button>
+          <button class="btn btn-secondary btn-sm" onclick="app.navigate('#dashboard')">Zurück</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cal-grid" style="display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;text-align:center;font-size:0.8rem">
+          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Mo</div>
+          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Di</div>
+          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Mi</div>
+          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Do</div>
+          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Fr</div>
+          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Sa</div>
+          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">So</div>
+          ${calendarDays.join('')}
+        </div>
+        <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md);flex-wrap:wrap;font-size:0.8rem;color:var(--c-text-3)">
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b82f6;margin-right:4px"></span>Anfrage</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;margin-right:4px"></span>Angebot</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:4px"></span>Bestätigt</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:4px"></span>Storniert</span>
+        </div>
+      </div>`;
+
+    const container = document.getElementById('page-content');
+    container.innerHTML = html;
+    lucide.createIcons();
+    window.scrollTo({ top: 0 });
+  },
+
+  async showDayEvents(year, month, day) {
+    const dateStr = new Date(year, month, day).toISOString().slice(0, 10);
+    const events = (await db.events.toArray()).filter(ev => ev.date === dateStr);
+    if (!events.length) return;
+    UI.toast(`${events.length} Event${events.length > 1 ? 's' : ''} am ${UI.formatDate(dateStr)}`, 'info');
+    // Anzeige im Modal
+    UI.modal('Events am ' + UI.formatDate(dateStr), events.map(e => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--c-border);cursor:pointer" onclick="UI.closeModal();app.navigate('#planner/${e.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>${e.clientName}</strong>
+          ${UI.statusBadge(e.status)}
+        </div>
+        <div class="text-muted" style="font-size:0.8rem">${e.eventType} · ${e.locations || 'Keine Location'}</div>
+      </div>
+    `).join(''), null, 'narrow');
+    lucide.createIcons();
+  },
+
+  // ═══════════════════════════════════════════════
+  // BESTANDS-KONFLIKT-PRÜFUNG (explizit)
+  // ═══════════════════════════════════════════════
+  async checkStockConflict(catalogItem, requestedQty, excludeEventId = null) {
+    if (catalogItem.isExternal || catalogItem.stock >= 999) return { conflict: false };
+    let used = 0;
+    const allEvents = await db.events.toArray();
+    for (const ev of allEvents) {
+      if (excludeEventId && ev.id === excludeEventId) continue;
+      const items = await db.equipmentItems.where({ eventId: ev.id, name: catalogItem.name }).toArray();
+      used += items.reduce((s, i) => s + (i.qty || 1), 0);
+    }
+    const available = Math.max(0, catalogItem.stock - used);
+    if (requestedQty > available) {
+      return { conflict: true, stock: catalogItem.stock, used, available, item: catalogItem };
+    }
+    return { conflict: false };
   }
 };
 
