@@ -980,8 +980,8 @@ const app = {
           <h1 class="page-title">Equipment: ${e.clientName}</h1>
         </div>
         <div style="text-align:right">
-          <div style="font-size:1.5rem;font-weight:700;color:var(--c-success)">${progress}%</div>
-          <div style="font-size:0.75rem;color:var(--c-text-3)">${totalPacked}/${totalNeeded} gepackt</div>
+          <div style="font-size:1.5rem;font-weight:700;color:var(--c-success)"><span class="pack-progress-text">${progress}%</span></div>
+          <div style="font-size:0.75rem;color:var(--c-text-3)"><span class="pack-packed-count">${totalPacked}</span>/<span class="pack-needed-count">${totalNeeded}</span> gepackt</div>
         </div>
       </div>
 
@@ -994,7 +994,7 @@ const app = {
 
       <div style="margin-bottom:var(--space-lg)">
         <div style="background:var(--c-bg);border-radius:var(--radius-md);height:8px;overflow:hidden">
-          <div style="width:${progress}%;height:100%;background:var(--c-success);transition:width 500ms ease"></div>
+          <div class="pack-progress-bar" style="width:${progress}%;height:100%;background:var(--c-success);transition:width 500ms ease"></div>
         </div>
       </div>
 
@@ -1022,17 +1022,33 @@ const app = {
   },
 
   async toggleEquipmentNeeded(id, checked) {
-    const scrollY = window.scrollY;
     await db.equipmentItems.update(id, { needed: checked, packed: checked ? false : false });
-    this.navigate(`#equipment/${this.currentEventId}`);
-    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+    const btn = document.querySelector(`input[onchange*="toggleEquipmentNeeded(${id},"]`);
+    if (!btn) return;
+    const row = btn.closest('.checklist-item');
+    const label = row?.querySelector('.checklist-label');
+    // Update progress bar + counter live
+    const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]')].filter(cb => !cb.hasAttribute('title')&&cb.checked).length;
+    const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(cb => cb.checked).length;
+    const percent = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
+    const progText = document.querySelector('.pack-progress-text');
+    const progBar = document.querySelector('.pack-progress-bar');
+    if (progText) progText.textContent = `${percent}%`;
+    if (progBar) progBar.style.width = `${percent}%`;
   },
 
   async toggleEquipmentPacked(id, checked) {
-    const scrollY = window.scrollY;
     await db.equipmentItems.update(id, { packed: checked });
-    this.navigate(`#equipment/${this.currentEventId}`);
-    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+    const cb = document.querySelector(`input[onchange*="toggleEquipmentPacked(${id},"]`);
+    if (cb) cb.checked = checked;
+    // Update progress bar live
+    const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]')].filter(c => !c.hasAttribute('title')&&c.checked).length;
+    const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(c => c.checked).length;
+    const percent = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
+    const progText = document.querySelector('.pack-progress-text');
+    const progBar = document.querySelector('.pack-progress-bar');
+    if (progText) progText.textContent = `${percent}%`;
+    if (progBar) progBar.style.width = `${percent}%`;
   },
 
   async deleteEquipmentItem(id) {
@@ -1040,8 +1056,22 @@ const app = {
     UI.confirm('Equipment-Position löschen?', async () => {
       await db.equipmentItems.delete(id);
       UI.toast('Gelöscht', 'info');
-      this.navigate(`#equipment/${this.currentEventId}`);
-      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+      // Lösche die DOM-Zeile direkt statt full re-render
+      const row = document.querySelector(`button[onclick*="deleteEquipmentItem(${id}"]`).closest('.checklist-item');
+      if (row) {
+        row.remove();
+        // Progress aktualisieren
+        const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]')].filter(c => !c.hasAttribute('title')&&c.checked).length;
+        const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(c => c.checked).length;
+        const percent = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
+        const progText = document.querySelector('.pack-progress-text');
+        const progBar = document.querySelector('.pack-progress-bar');
+        if (progText) progText.textContent = `${percent}%`;
+        if (progBar) progBar.style.width = `${percent}%`;
+      } else {
+        this.navigate(`#equipment/${this.currentEventId}`);
+        requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+      }
     });
   },
 
