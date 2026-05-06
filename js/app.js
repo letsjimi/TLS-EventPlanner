@@ -1546,6 +1546,7 @@ const app = {
       equipmentItems: await db.equipmentItems.toArray(),
       equipmentCatalog: await db.equipmentCatalog.toArray(),
       payments: await db.payments.toArray(),
+      eventTodos: await db.eventTodos.toArray(),
       exportedAt: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1575,6 +1576,7 @@ const app = {
         await db.equipmentItems.clear();
         await db.equipmentCatalog.clear();
         await db.payments.clear();
+        await db.eventTodos.clear();
         if (data.events) await db.events.bulkAdd(data.events);
         if (data.locations) await db.locations.bulkAdd(data.locations);
         if (data.contacts) await db.contacts.bulkAdd(data.contacts);
@@ -1582,6 +1584,7 @@ const app = {
         if (data.equipmentItems) await db.equipmentItems.bulkAdd(data.equipmentItems);
         if (data.equipmentCatalog) await db.equipmentCatalog.bulkAdd(data.equipmentCatalog);
         if (data.payments) await db.payments.bulkAdd(data.payments);
+        if (data.eventTodos) await db.eventTodos.bulkAdd(data.eventTodos);
         UI.toast('Daten importiert', 'success');
         this.navigate('#dashboard');
       } catch (err) {
@@ -1981,18 +1984,11 @@ const app = {
       return;
     }
 
-    // Bestands-Konflikt-Prüfung
+    // Bestands-Konflikt-Prüfung via zentrale Funktion
     if (!item.isExternal && item.stock < 999) {
-      const allEvents = await db.events.toArray();
-      const eventIds = allEvents.filter(ev => ev.id !== this.currentEventId).map(ev => ev.id);
-      let used = 0;
-      for (const eid of eventIds) {
-        const evItems = await db.equipmentItems.where({ eventId: eid, name: item.name }).toArray();
-        used += evItems.reduce((s, i) => s + (i.qty || 1), 0);
-      }
-      const available = Math.max(0, item.stock - used);
-      if (qty > available) {
-        UI.toast(`⚠️ Nicht genug auf Lager! ${available}/${item.stock} verfügbar, ${used} in anderen Events gebucht.`, 'error', 5000);
+      const conflict = await this.checkStockConflict(item, qty, this.currentEventId);
+      if (conflict.conflict) {
+        UI.toast(`⚠️ Nicht genug auf Lager! ${conflict.available}/${conflict.stock} verfügbar, ${conflict.used} in anderen Events gebucht.`, 'error', 5000);
         return;
       }
     }
@@ -2066,14 +2062,15 @@ const app = {
   },
 
   async addEventTodo() {
-    UI.formModal('Neues TODO', [
+    UI.openModal('Neues TODO', `<form id="todo-form">${UI.form([
       { name: 'title', label: 'Aufgabe', required: true },
       { name: 'dueDate', label: 'Fällig bis', type: 'date' }
-    ], {}, async (vals) => {
+    ])}</form>`, async () => {
+      const data = UI.getFormData(document.getElementById('todo-form'));
       await db.eventTodos.add({
         eventId: this.currentEventId,
-        title: vals.title,
-        dueDate: vals.dueDate || '',
+        title: data.title,
+        dueDate: data.dueDate || '',
         done: false
       });
       UI.toast('TODO hinzugefügt', 'success');
@@ -2217,13 +2214,16 @@ const app = {
     }
 
     const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    // Korrigierte Anzeige bei Monatsüberlauf (z.B. month = -1 → Dez Vorjahr)
+    const displayMonth = (month % 12 + 12) % 12;
+    const displayYear = year + Math.floor(month / 12);
 
     const html = `
       <div class="page-header" style="flex-wrap:wrap;gap:var(--space-sm)">
         <div><h1 class="page-title">Verfügbarkeitskalender</h1><p class="page-subtitle">Auftragsübersicht</p></div>
         <div style="display:flex;gap:var(--space-sm);align-items:center">
           <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${year},${month - 1})">◀</button>
-          <span style="font-weight:600">${monthNames[month]} ${year}</span>
+          <span style="font-weight:600">${monthNames[displayMonth]} ${displayYear}</span>
           <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${year},${month + 1})">▶</button>
           <button class="btn btn-secondary btn-sm" onclick="app.navigate('#dashboard')">Zurück</button>
         </div>
