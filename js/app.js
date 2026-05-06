@@ -519,7 +519,15 @@ const app = {
         <div>
           <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:4px">
             <span style="font-size:0.875rem;color:var(--c-text-3)">${e.orderNumber}</span>
-            ${UI.statusBadge(e.status)}
+            <select onchange="app.changeEventStatus(${e.id}, this.value)" class="form-select" style="width:auto;padding:4px 8px;font-size:0.8125rem;height:auto;min-height:auto;background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-md);color:var(--c-text);font-weight:600">
+              <option value="inquiry"   ${e.status==='inquiry'   ? 'selected' : ''}>🔵 Anfrage</option>
+              <option value="offer"     ${e.status==='offer'     ? 'selected' : ''}>🟡 Angebot</option>
+              <option value="inspected" ${e.status==='inspected' ? 'selected' : ''}>🟣 Besichtigt</option>
+              <option value="confirmed" ${e.status==='confirmed' ? 'selected' : ''}>🟢 Bestätigt</option>
+              <option value="paid"      ${e.status==='paid'      ? 'selected' : ''}>💧 Bezahlt</option>
+              <option value="done"      ${e.status==='done'      ? 'selected' : ''}>⚪ Abgeschlossen</option>
+              <option value="cancelled" ${e.status==='cancelled' ? 'selected' : ''}>🔴 Storniert</option>
+            </select>
           </div>
           <h1 class="page-title">${e.clientName}</h1>
           <p class="page-subtitle">${e.eventType} · ${UI.formatDate(e.date)} · ${e.locations || 'Keine Location'}</p>
@@ -1059,19 +1067,36 @@ const app = {
     let added = 0;
     for (const item of matches) {
       if (!existingNames.has(item.name)) {
-        await db.equipmentItems.add({
-          eventId: this.currentEventId,
-          category: item.category,
-          name: item.name,
-          qty: 1,
-          needed: true,
-          packed: false,
-          note: `Paket: ${pkg.name}`,
-          source: 'package',
-          isExternal: !!item.isExternal,
-          priceDay: item.priceDay || 0
-        });
-        added++;
+        // Bestands-Check
+        let canAdd = true;
+        if (!item.isExternal && item.stock < 999) {
+          const allEv = await db.events.toArray();
+          const evIds = allEv.filter(ev => ev.id !== this.currentEventId).map(ev => ev.id);
+          let used = 0;
+          for (const eid of evIds) {
+            const ei = await db.equipmentItems.where({ eventId: eid, name: item.name }).toArray();
+            used += ei.reduce((s, i) => s + (i.qty || 1), 0);
+          }
+          if (used >= item.stock) {
+            UI.toast(`⚠️ "${item.name}" nicht hinzugefügt – Lager leer (${item.stock}/${item.stock} gebucht)`, 'warning', 4000);
+            canAdd = false;
+          }
+        }
+        if (canAdd) {
+          await db.equipmentItems.add({
+            eventId: this.currentEventId,
+            category: item.category,
+            name: item.name,
+            qty: 1,
+            needed: true,
+            packed: false,
+            note: `Paket: ${pkg.name}`,
+            source: 'package',
+            isExternal: !!item.isExternal,
+            priceDay: item.priceDay || 0
+          });
+          added++;
+        }
       }
     }
 
@@ -1660,6 +1685,7 @@ const app = {
               <th>Kategorie</th>
               <th>Name</th>
               <th>Einheit</th>
+              <th>Lager</th>
               <th>€/Tag</th>
               <th>Tags</th>
               <th>Herkunft</th>
@@ -1671,6 +1697,7 @@ const app = {
                   <td><span style="color:var(--c-text-3);font-size:0.8125rem">${item.category}</span></td>
                   <td><strong>${item.name}</strong></td>
                   <td>${item.unit || '–'}</td>
+                  <td><span style="font-weight:600;color:${item.stock <= 2 ? 'var(--c-warning)' : item.stock >= 10 ? 'var(--c-success)' : 'var(--c-text)'}" title="${item.stock} im Lager">${item.stock}</span></td>
                   <td>${item.priceDay ? item.priceDay.toFixed(2) + ' €' : '–'}</td>
                   <td>${(item.tags || []).slice(0,4).map(t => `<span class="badge" style="font-size:0.65rem;margin:1px">${t}</span>`).join(' ')}
                     ${(item.tags || []).length > 4 ? `<span style="font-size:0.65rem;color:var(--c-text-3)">+${item.tags.length-4}</span>` : ''}
@@ -1720,6 +1747,7 @@ const app = {
       { name: 'category', label: 'Kategorie', placeholder: 'z.B. Mischpult, Lautsprecher' },
       { name: 'name', label: 'Name', placeholder: 'z.B. Allen & Heath SQ6' },
       { name: 'unit', label: 'Einheit', placeholder: 'Stk, Set, Paar, Rolle' },
+      { name: 'stock', label: 'Lager-Bestand', type: 'number', placeholder: '1' },
       { name: 'priceDay', label: 'Preis pro Tag (€)', type: 'number', placeholder: '0' },
       { name: 'tags', label: 'Tags (kommasepariert)', placeholder: 'PA, Mischpult, Band' },
       { name: 'isExternal', label: 'Externe Miete?', type: 'checkbox' }
@@ -1727,6 +1755,7 @@ const app = {
     UI.openModal('Gerät zum Katalog hinzufügen', `<form id="cat-form">${UI.form(fields)}</form>`, async () => {
       const d = UI.getFormData(document.getElementById('cat-form'));
       d.priceDay = parseFloat(d.priceDay) || 0;
+      d.stock = parseInt(d.stock) || 1;
       d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
       d.isExternal = !!d.isExternal;
       await db.equipmentCatalog.add(d);
@@ -1741,6 +1770,7 @@ const app = {
       { name: 'category', label: 'Kategorie', value: item.category },
       { name: 'name', label: 'Name', value: item.name },
       { name: 'unit', label: 'Einheit', value: item.unit },
+      { name: 'stock', label: 'Lager-Bestand', type: 'number', value: item.stock },
       { name: 'priceDay', label: 'Preis pro Tag (€)', type: 'number', value: item.priceDay },
       { name: 'tags', label: 'Tags (kommasepariert)', value: (item.tags || []).join(', ') },
       { name: 'isExternal', label: 'Externe Miete?', type: 'checkbox', value: item.isExternal }
@@ -1748,6 +1778,7 @@ const app = {
     UI.openModal('Gerät bearbeiten', `<form id="cat-edit-form">${UI.form(fields)}</form>`, async () => {
       const d = UI.getFormData(document.getElementById('cat-edit-form'));
       d.priceDay = parseFloat(d.priceDay) || 0;
+      d.stock = parseInt(d.stock) || 1;
       d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
       d.isExternal = !!d.isExternal;
       await db.equipmentCatalog.update(id, d);
@@ -1940,6 +1971,22 @@ const app = {
       return;
     }
 
+    // Bestands-Konflikt-Prüfung
+    if (!item.isExternal && item.stock < 999) {
+      const allEvents = await db.events.toArray();
+      const eventIds = allEvents.filter(ev => ev.id !== this.currentEventId).map(ev => ev.id);
+      let used = 0;
+      for (const eid of eventIds) {
+        const evItems = await db.equipmentItems.where({ eventId: eid, name: item.name }).toArray();
+        used += evItems.reduce((s, i) => s + (i.qty || 1), 0);
+      }
+      const available = Math.max(0, item.stock - used);
+      if (qty > available) {
+        UI.toast(`⚠️ Nicht genug auf Lager! ${available}/${item.stock} verfügbar, ${used} in anderen Events gebucht.`, 'error', 5000);
+        return;
+      }
+    }
+
     await db.equipmentItems.add({
       eventId: this.currentEventId,
       category: item.category,
@@ -1971,6 +2018,13 @@ const app = {
       await db.delete();
       location.reload();
     });
+  },
+
+  async changeEventStatus(id, status) {
+    const statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt', confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' };
+    await db.events.update(id, { status, statusLabel: statusLabel[status] });
+    UI.toast(`Status: ${statusLabel[status]}`, 'success');
+    this.navigate(`#planner/${id}`);
   }
 };
 
