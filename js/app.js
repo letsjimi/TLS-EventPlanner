@@ -1022,20 +1022,26 @@ const app = {
   },
 
   async toggleEquipmentNeeded(id, checked) {
+    const scrollY = window.scrollY;
     await db.equipmentItems.update(id, { needed: checked, packed: checked ? false : false });
     this.navigate(`#equipment/${this.currentEventId}`);
+    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
   },
 
   async toggleEquipmentPacked(id, checked) {
+    const scrollY = window.scrollY;
     await db.equipmentItems.update(id, { packed: checked });
     this.navigate(`#equipment/${this.currentEventId}`);
+    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
   },
 
   async deleteEquipmentItem(id) {
+    const scrollY = window.scrollY;
     UI.confirm('Equipment-Position löschen?', async () => {
       await db.equipmentItems.delete(id);
       UI.toast('Gelöscht', 'info');
       this.navigate(`#equipment/${this.currentEventId}`);
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
     });
   },
 
