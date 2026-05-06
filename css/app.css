@@ -863,38 +863,52 @@ body {
     margin: 14mm;
   }
 
+  /* ── UI ausblenden ── */
   .sidebar, .topbar, .menu-toggle, .btn-ghost,
   .modal-overlay, .modal, .toast-container,
   .btn-primary, .btn-secondary, .btn-icon,
   .kanban-card .kanban-card-meta span:last-child,
-  #global-search, .maps-row {
+  #global-search, .maps-row, .sidebar-footer,
+  .sidebar-overlay, .lock-screen, .event-tabs,
+  .page-header button, .card button {
     display: none !important;
   }
 
-  .main { margin-left: 0 !important; }
+  /* ── Layout zurücksetzen ── */
+  .main { margin-left: 0 !important; margin-bottom: 0 !important; }
   .page-content { padding: 0 !important; }
 
-  body {
+  /* ── Seite: Weißer Hintergrund, schwarzer Text ── */
+  html, body {
     background: white !important;
     color: #222 !important;
     font-size: 10pt !important;
     line-height: 1.4 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* ── Karten: dürfen umbrechen, aber Inhalt schützt sich ── */
+  /* ── Karten: weiß, keine Schatten ── */
   .card {
-    border: 0.75pt solid #bbb;
-    border-radius: 5pt;
-    padding: 10pt;
-    margin-bottom: 10pt;
+    border: 0.75pt solid #bbb !important;
+    border-radius: 5pt !important;
+    padding: 10pt !important;
+    margin-bottom: 10pt !important;
     background: white !important;
+    color: #222 !important;
     break-inside: auto;
     page-break-inside: auto;
+    box-shadow: none !important;
   }
-  .card-header { background: none !important; }
-  .card-title { color: #222 !important; font-size: 11pt !important; }
+  .card-header { background: none !important; border-bottom: 0.5pt solid #ddd !important; }
+  .card-title {
+    color: #222 !important;
+    font-size: 11pt !important;
+    font-weight: 700 !important;
+  }
+  .card-title i { display: none !important; }
 
-  /* ── Überschriften nicht allein am Seitenende ── */
+  /* ── Überschriften ── */
   h1.page-title, h2, h3, h4 {
     page-break-after: avoid;
     break-after: avoid;
@@ -903,35 +917,48 @@ body {
   h1.page-title { font-size: 16pt !important; margin-bottom: 8pt !important; }
   h2 { font-size: 12pt !important; }
 
-  /* ── Tabellen: Zeilen nicht mitten brechen ── */
-  .data-table { border-collapse: collapse; width: 100%; font-size: 9.5pt; }
+  /* ── Tabellen ── */
+  .data-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 9.5pt;
+    color: #222 !important;
+  }
   .data-table th,
   .data-table td {
-    border: 0.5pt solid #bbb;
-    padding: 5pt 6pt;
+    border: 0.5pt solid #bbb !important;
+    padding: 5pt 6pt !important;
     text-align: left;
     background: white !important;
+    color: #222 !important;
   }
   .data-table th {
     background: #f0f0f0 !important;
     font-weight: 700;
+    color: #111 !important;
   }
-  .data-table thead { display: table-header-group; }
+  .data-table thead { display: table-header-group !important; }
   .data-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .data-table td:first-child { font-weight: 600; color: #222 !important; }
 
-  /* ── Timeline: Items nicht mitten brechen ── */
-  .timeline-item { break-inside: avoid; page-break-inside: avoid; }
-  .timeline::before { background: #ccc !important; }
-  .timeline-dot { border-color: white !important; }
-
-  /* ── Kontakt-Karten / Location-Cards ── */
-  .contact-grid > .card,
-  .locations-grid > .card {
+  /* ── Timeline ── */
+  .timeline-item {
     break-inside: avoid;
     page-break-inside: avoid;
+    margin-bottom: 4pt;
   }
+  .timeline::before { background: #ccc !important; }
+  .timeline-dot { border-color: white !important; background: #e94560 !important; }
+  .timeline-time { color: #e94560 !important; font-weight: 700 !important; }
+  .timeline-content {
+    background: white !important;
+    border: 0.5pt solid #bbb !important;
+    color: #222 !important;
+  }
+  .timeline-title { color: #222 !important; }
+  .timeline-desc { color: #555 !important; }
 
-  /* ── Status-Badges: Rahmen statt dunkler Hintergrund ── */
+  /* ── Status-Badges: Rahmen statt Hintergrund ── */
   .badge {
     background: none !important;
     border: 0.5pt solid currentColor !important;
@@ -942,25 +969,78 @@ body {
   .badge-success { border-color: #2e7d32 !important; color: #2e7d32 !important; }
   .badge-warning { border-color: #ed6c02 !important; color: #ed6c02 !important; }
   .badge-danger  { border-color: #d32f2f !important; color: #d32f2f !important; }
-
-  /* ── Links ── */
-  a { text-decoration: none !important; color: #222 !important; }
-  a[href^="tel:"]::before { content: '📞 '; }
-  a[href^="mailto:"]::before { content: '✉ '; }
+  .badge-offer   { border-color: #f59e0b !important; color: #f59e0b !important; }
+  .badge-confirmed { border-color: #22c55e !important; color: #22c55e !important; }
+  .badge-paid    { border-color: #06b6d4 !important; color: #06b6d4 !important; }
+  .badge-done    { border-color: #64748b !important; color: #64748b !important; }
+  .badge-inquiry { border-color: #3b82f6 !important; color: #3b82f6 !important; }
+  .badge-inspected { border-color: #8b5cf6 !important; color: #8b5cf6 !important; }
+  .badge-cancelled { border-color: #ef4444 !important; color: #ef4444 !important; }
 
   /* ── Checkliste ── */
-  .checklist-item { break-inside: avoid; page-break-inside: avoid; font-size: 9.5pt; }
-  .checklist-checkbox { border-color: #888 !important; }
-  .checklist-label.checked { text-decoration: line-through; color: #888 !important; }
-
-  /* ── Timeline: Items nicht mitten brechen ── */
-  .timeline-item {
+  .checklist-item {
     break-inside: avoid;
     page-break-inside: avoid;
-    margin-bottom: 4pt;
+    font-size: 9.5pt;
+    border-bottom: 0.5pt solid #ddd !important;
+    padding: 3pt 0 !important;
+    color: #222 !important;
   }
-  .timeline::before { background: #ccc !important; }
-  .timeline-dot { border-color: white !important; }
+  .checklist-checkbox {
+    border-color: #888 !important;
+    background: white !important;
+  }
+  .checklist-checkbox:checked {
+    background: #22c55e !important;
+    border-color: #22c55e !important;
+  }
+  .checklist-label { color: #222 !important; }
+  .checklist-label.checked {
+    text-decoration: line-through;
+    color: #888 !important;
+  }
+
+  /* ── Stat-Cards ── */
+  .stat-card {
+    background: white !important;
+    border: 0.75pt solid #bbb !important;
+    box-shadow: none !important;
+    color: #222 !important;
+  }
+  .stat-icon.accent { color: #e94560 !important; background: none !important; }
+  .stat-icon.success { color: #22c55e !important; background: none !important; }
+  .stat-icon.warning { color: #f59e0b !important; background: none !important; }
+  .stat-icon.info { color: #3b82f6 !important; background: none !important; }
+  .stat-value { color: #111 !important; }
+  .stat-label { color: #555 !important; }
+
+  /* ── Textfarben auf Schwarz ── */
+  .text-accent, .text-success, .text-warning, .text-danger, .text-muted {
+    color: #222 !important;
+  }
+  .page-subtitle, .text-muted { color: #555 !important; }
+
+  /* ── Form-Inputs (falls im Print sichtbar) ── */
+  .form-input, .form-select, .form-textarea {
+    background: white !important;
+    border: 0.5pt solid #bbb !important;
+    color: #222 !important;
+  }
+
+  /* ── Kanban ── */
+  .kanban-column {
+    background: white !important;
+    border: 0.75pt solid #bbb !important;
+    box-shadow: none !important;
+  }
+  .kanban-card {
+    background: #f8f8f8 !important;
+    border: 0.5pt solid #ccc !important;
+    box-shadow: none !important;
+    color: #222 !important;
+  }
+  .kanban-card-title { color: #222 !important; }
+  .kanban-card-meta { color: #555 !important; }
 
   /* ── Puffer am Seitenende ── */
   .page-content { padding-bottom: 20pt !important; }
