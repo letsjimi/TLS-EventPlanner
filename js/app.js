@@ -639,7 +639,9 @@ const app = {
                 <div class="timeline-desc">${t.detail || ''}${t.location ? ' · 📍 ' + t.location : ''}${t.duration ? ' · ⏱️ ' + t.duration : ''}${t.crew ? ' · 👤 ' + t.crew : ''}</div>
               </div>
               <div style="display:flex;gap:4px">
-                <button class="btn btn-icon btn-ghost" onclick="app.toggleTimelineDone(${t.id})"><i data-lucide="${t.done ? 'check-circle' : 'circle'}" style="width:16px;height:16px;color:${t.done ? 'var(--c-success)' : 'var(--c-text-3)'}"></i></button>
+                <button class="btn btn-icon btn-ghost timeline-check" onclick="app.toggleTimelineDone(${t.id})" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center" aria-label="Erledigt">
+                  <i data-lucide="${t.done ? 'check-circle' : 'circle'}" style="width:22px;height:22px;color:${t.done ? 'var(--c-success)' : 'var(--c-text-3)'}"></i>
+                </button>
                 <button class="btn btn-icon btn-ghost" onclick="app.editTimelineItem(${t.id})"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
                 <button class="btn btn-icon btn-ghost" onclick="app.deleteTimelineItem(${t.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
               </div>
@@ -746,16 +748,20 @@ const app = {
   },
 
   async toggleTimelineDone(id) {
+    const scrollY = window.scrollY;
     const t = await db.timeline.get(id);
     await db.timeline.update(id, { done: !t.done });
     this.navigate(`#planner/${this.currentEventId}`);
+    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
   },
 
   async deleteTimelineItem(id) {
+    const scrollY = window.scrollY;
     UI.confirm('Position löschen?', async () => {
       await db.timeline.delete(id);
       UI.toast('Gelöscht', 'info');
       this.navigate(`#planner/${this.currentEventId}`);
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
     });
   },
 
@@ -2079,17 +2085,21 @@ const app = {
   },
 
   async toggleEventTodo(id) {
+    const scrollY = window.scrollY;
     const t = await db.eventTodos.get(id);
     if (!t) return;
     await db.eventTodos.update(id, { done: !t.done });
     this.navigate(`#planner/${this.currentEventId}`);
+    requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
   },
 
   async deleteEventTodo(id) {
+    const scrollY = window.scrollY;
     UI.confirm('TODO löschen?', async () => {
       await db.eventTodos.delete(id);
       UI.toast('TODO gelöscht', 'info');
       this.navigate(`#planner/${this.currentEventId}`);
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
     });
   },
 

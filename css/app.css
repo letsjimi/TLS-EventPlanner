@@ -802,8 +802,8 @@ body {
 
 .checklist-checkbox {
   appearance: none;
-  width: 20px; height: 20px;
-  border: 2px solid var(--c-border);
+  width: 24px; height: 24px;
+  border: 2.5px solid var(--c-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
   position: relative;
@@ -819,10 +819,10 @@ body {
 .checklist-checkbox:checked::after {
   content: '';
   position: absolute;
-  left: 5px; top: 1px;
-  width: 5px; height: 10px;
+  left: 6px; top: 2px;
+  width: 6px; height: 12px;
   border: solid white;
-  border-width: 0 2px 2px 0;
+  border-width: 0 2.5px 2.5px 0;
   transform: rotate(45deg);
 }
 
