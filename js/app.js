@@ -533,18 +533,18 @@ const app = {
           <h1 class="page-title">${e.clientName}</h1>
           <p class="page-subtitle">${e.eventType} · ${UI.formatDate(e.date)} · ${e.locations || 'Keine Location'}</p>
         </div>
-        <div style="display:flex;gap:var(--space-sm)">
+        <div class="page-header-actions">
           <button class="btn btn-secondary btn-sm" onclick="app.generateOfferPDF(${e.id})" title="Angebot als PDF">
-            <i data-lucide="file-text" style="width:16px;height:16px"></i>Angebot
+            <i data-lucide="file-text" style="width:16px;height:16px"></i><span>Angebot</span>
           </button>
           <button class="btn btn-secondary btn-sm" onclick="app.sendEventEmail(${e.id})" title="Per E-Mail versenden">
-            <i data-lucide="mail" style="width:16px;height:16px"></i>E-Mail
+            <i data-lucide="mail" style="width:16px;height:16px"></i><span>E-Mail</span>
           </button>
           <button class="btn btn-secondary btn-sm" onclick="app.shareEvent(${e.id})" title="Öffentlichen Link erstellen">
-            <i data-lucide="share-2" style="width:16px;height:16px"></i>Teilen
+            <i data-lucide="share-2" style="width:16px;height:16px"></i><span>Teilen</span>
           </button>
           <button class="btn btn-secondary" onclick="app.editEvent(${e.id})">
-            <i data-lucide="pencil" style="width:16px;height:16px"></i>Bearbeiten
+            <i data-lucide="pencil" style="width:16px;height:16px"></i><span>Bearbeiten</span>
           </button>
           <button class="btn btn-ghost" onclick="app.deleteEvent(${e.id})">
             <i data-lucide="trash-2" style="width:16px;height:16px"></i>
