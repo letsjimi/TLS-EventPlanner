@@ -533,6 +533,12 @@ const app = {
           <p class="page-subtitle">${e.eventType} · ${UI.formatDate(e.date)} · ${e.locations || 'Keine Location'}</p>
         </div>
         <div style="display:flex;gap:var(--space-sm)">
+          <button class="btn btn-secondary btn-sm" onclick="app.generateOfferPDF(${e.id})" title="Angebot als PDF">
+            <i data-lucide="file-text" style="width:16px;height:16px"></i>Angebot
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="app.sendEventEmail(${e.id})" title="Per E-Mail versenden">
+            <i data-lucide="mail" style="width:16px;height:16px"></i>E-Mail
+          </button>
           <button class="btn btn-secondary btn-sm" onclick="app.shareEvent(${e.id})" title="Öffentlichen Link erstellen">
             <i data-lucide="share-2" style="width:16px;height:16px"></i>Teilen
           </button>
@@ -567,7 +573,7 @@ const app = {
       </div>
 
       <!-- TIMELINE -->
-      <div class="card">
+      <div class="card mb-3">
         <div class="card-header">
           <div class="card-title"><i data-lucide="clock"></i>Tagesablauf</div>
           <button class="btn btn-sm btn-primary" onclick="app.addTimelineItem()">
@@ -575,7 +581,10 @@ const app = {
           </button>
         </div>
         ${this.renderTimeline(timeline)}
-      </div>`;
+      </div>
+
+      <!-- TODOS -->
+      ${await this.renderEventTodos(this.currentEventId)}`;
   },
 
   renderLocations(locations) {
