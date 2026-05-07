@@ -6,6 +6,7 @@
 const app = {
   currentPage: 'dashboard',
   currentEventId: null,
+  _navSeq: 0,
 
   // ═══════════════════════════════════════════════
   // INIT
@@ -43,7 +44,16 @@ const app = {
     this.checkLock();
 
     // NORMAL ROUTE
+    const seq = ++this._navSeq;
     this.currentPage = mainPage;
+
+    // Auf Mobile: Sidebar immer schließen wenn offen
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+      document.getElementById('sidebar-overlay')?.classList.remove('active');
+    }
+
     document.querySelector('.sidebar')?.classList.remove('hidden');
     document.querySelector('.topbar')?.classList.remove('hidden');
 
@@ -71,6 +81,8 @@ const app = {
 
     const renderer = renderers[mainPage] || renderers.dashboard;
     renderer().then(html => {
+      // Guard: abbrechen wenn inzwischen neere Navigation passiert ist
+      if (this._navSeq !== seq) return;
       content.innerHTML = html;
       lucide.createIcons();
       this.postRender(mainPage);
@@ -82,14 +94,7 @@ const app = {
   },
 
   bindNavigation() {
-    document.querySelectorAll('.nav-item').forEach(el => {
-      el.addEventListener('click', (e) => {
-        if (window.innerWidth < 768) {
-          document.getElementById('sidebar').classList.remove('open');
-          document.getElementById('sidebar-overlay')?.classList.remove('active');
-        }
-      });
-    });
+    // Sidebar wird jetzt in navigate() automatisch geschlossen
   },
 
   bindMobileMenu() {
