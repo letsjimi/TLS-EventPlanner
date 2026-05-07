@@ -2602,11 +2602,18 @@ const app = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${e.orderNumber || 'TLS-Event'}.ics`;
+    const filename = `${e.orderNumber || 'TLS-Event'}.ics`;
+    a.setAttribute('download', filename);
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener');
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    // Safari needs the anchor element alive during async download start
+    setTimeout(() => {
+      if (a.parentNode) a.remove();
+      URL.revokeObjectURL(url);
+    }, 1000);
 
     UI.toast('Event als .ics exportiert – importiere es in Outlook / Google / Apple Kalender', 'success');
   },
