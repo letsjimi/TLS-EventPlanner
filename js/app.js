@@ -27,7 +27,8 @@ const app = {
   // ═══════════════════════════════════════════════
   navigate(hash) {
     const raw = hash.replace('#', '') || 'dashboard';
-    const [mainPage, subPage] = raw.split('/');
+    const [mainPage, ...subParts] = raw.split('/');
+    const subPage = subParts.join('/');
 
     // SHARE ROUTE (/share/:token)
     if (mainPage === 'share' && subPage) {
