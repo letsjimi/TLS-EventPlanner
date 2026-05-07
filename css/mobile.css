@@ -253,7 +253,11 @@ body.pwa-standalone .main {
 
 /* ── Kanban ───────────────────────────────── */
 .kanban { flex-direction: column; gap: var(--space-md); overflow-x: visible; }
-.kanban-col { width: 100%; min-width: 0; }
+.kanban-column { width: 100%; min-width: 0; border-left: 4px solid var(--c-border); border-radius: var(--radius-md); }
+.kanban-card { padding: var(--space-md); }
+.kanban-drophere { display: none; }
+.kanban-card-title { font-size: 1rem; }
+.kanban-card-meta { font-size: 0.85rem; }
 
 /* ── Modals → Bottom Sheets ───────────────── */
 .modal {

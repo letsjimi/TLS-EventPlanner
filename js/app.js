@@ -274,7 +274,7 @@ const app = {
           </div>
           <div class="kanban-drophere" data-status="${col.key}">Hier ablegen</div>
           ${colEvents.map(e => `
-            <div class="kanban-card" data-event-id="${e.id}" data-current-status="${e.status}" draggable="true" ondragstart="app._kanbanDragStart(event)" ondragend="app._kanbanDragEnd(event)" oncontextmenu="event.preventDefault();app._kanbanContextMenu(${e.id},'${e.status}')" ontouchstart="app._kanbanTouchStart(event,this)" ontouchmove="app._kanbanTouchMove(event,this)" ontouchend="app._kanbanTouchEnd(event,this)">
+            <div class="kanban-card" data-event-id="${e.id}" data-current-status="${e.status}" draggable="true" onclick="app.openEvent(${e.id})" ondragstart="app._kanbanDragStart(event)" ondragend="app._kanbanDragEnd(event)" oncontextmenu="event.preventDefault();app._kanbanContextMenu(${e.id},'${e.status}')" ontouchstart="app._kanbanTouchStart(event,this)" ontouchmove="app._kanbanTouchMove(event,this)" ontouchend="app._kanbanTouchEnd(event,this)">
               <div class="kanban-card-title">${e.clientName || 'Unbekannt'}</div>
               <div class="kanban-card-meta">
                 <span>📅 ${UI.formatDate(e.date)} · ${e.eventType}</span>
@@ -343,53 +343,37 @@ const app = {
     return all.filter(s => s.key !== current);
   },
 
-  // ── Touch-Drag (Long-Press + Swipe) ──
+  // ── Mobile Touch ──
   _kanbanTouchStart(ev, el) {
     if (this._kanbanTouchTimer) clearTimeout(this._kanbanTouchTimer);
-    this._kanbanTouchTimer = setTimeout(() => {
-      // Long-Press: Card wird "lifted"
-      el.classList.add('touch-dragging');
-      this._kanbanTouchActive = el;
-    }, 500);
     this._kanbanTouchMoved = false;
+    this._kanbanTouchStartX = ev.touches[0].clientX;
+    this._kanbanTouchStartY = ev.touches[0].clientY;
+    // Long-Press (>500ms) → Status-Ändern-Modal
+    this._kanbanTouchTimer = setTimeout(() => {
+      this._kanbanTouchTimer = null;
+      this._kanbanTouchMoved = true; // verhindert Click nach Long-Press
+      this._kanbanContextMenu(parseInt(el.dataset.eventId), el.dataset.currentStatus);
+    }, 500);
   },
   _kanbanTouchMove(ev, el) {
-    if (this._kanbanTouchTimer) { clearTimeout(this._kanbanTouchTimer); this._kanbanTouchTimer = null; }
-    if (this._kanbanTouchActive) {
-      // Card bewegt sich mit Finger
-      const touch = ev.touches[0];
-      el.style.position = 'fixed';
-      el.style.zIndex = '9999';
-      el.style.width = el.offsetWidth + 'px';
-      el.style.left = (touch.clientX - el.offsetWidth/2) + 'px';
-      el.style.top = (touch.clientY - 40) + 'px';
+    if (!this._kanbanTouchStartX) return;
+    const dx = Math.abs(ev.touches[0].clientX - this._kanbanTouchStartX);
+    const dy = Math.abs(ev.touches[0].clientY - this._kanbanTouchStartY);
+    if (dx > 10 || dy > 10) {
+      // Finger bewegt sich → Long-Press abbrechen, normal scrollen
+      if (this._kanbanTouchTimer) { clearTimeout(this._kanbanTouchTimer); this._kanbanTouchTimer = null; }
+      this._kanbanTouchMoved = true;
     }
-    this._kanbanTouchMoved = true;
   },
   _kanbanTouchEnd(ev, el) {
     if (this._kanbanTouchTimer) { clearTimeout(this._kanbanTouchTimer); this._kanbanTouchTimer = null; }
-    if (this._kanbanTouchActive) {
-      // Prüfe auf welche Column getroffen wurde
-      const touch = ev.changedTouches[0];
-      const target = document.elementFromPoint(touch.clientX, touch.clientY);
-      const col = target?.closest('.kanban-column');
-      if (col) {
-        const newStatus = col.dataset.status;
-        const eventId = parseInt(el.dataset.eventId);
-        const currentStatus = el.dataset.currentStatus;
-        if (newStatus !== currentStatus) {
-          this.changeEventStatus(eventId, newStatus);
-        }
-      }
-      // Reset styles
-      el.style.position = '';
-      el.style.zIndex = '';
-      el.style.width = '';
-      el.style.left = '';
-      el.style.top = '';
-      el.classList.remove('touch-dragging');
-      this._kanbanTouchActive = null;
+    if (!this._kanbanTouchMoved) {
+      // Kurzer Tap ohne Bewegung → onclick öffnet Event (kein preventDefault)
     }
+    this._kanbanTouchMoved = false;
+    this._kanbanTouchStartX = null;
+    this._kanbanTouchStartY = null;
   },
 
   _kanbanSetup() {
