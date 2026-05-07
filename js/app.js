@@ -103,7 +103,18 @@ const app = {
   },
 
   bindNavigation() {
-    // Sidebar wird jetzt in navigate() automatisch geschlossen
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const page = el.dataset.page || el.getAttribute('href')?.replace('#', '');
+        if (!page) return;
+        app.navigate('#' + page);
+        // Auf Mobile Sidebar schließen
+        document.getElementById('sidebar')?.classList.remove('open');
+        document.getElementById('sidebar-overlay')?.classList.remove('active');
+      });
+    });
   },
 
   bindMobileMenu() {
