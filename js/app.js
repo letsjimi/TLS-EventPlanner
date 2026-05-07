@@ -1789,14 +1789,14 @@ const app = {
         await db.equipmentCatalog.clear();
         await db.payments.clear();
         await db.eventTodos.clear();
-        if (data.events) await db.events.bulkAdd(data.events);
-        if (data.locations) await db.locations.bulkAdd(data.locations);
-        if (data.contacts) await db.contacts.bulkAdd(data.contacts);
-        if (data.timeline) await db.timeline.bulkAdd(data.timeline);
-        if (data.equipmentItems) await db.equipmentItems.bulkAdd(data.equipmentItems);
-        if (data.equipmentCatalog) await db.equipmentCatalog.bulkAdd(data.equipmentCatalog);
-        if (data.payments) await db.payments.bulkAdd(data.payments);
-        if (data.eventTodos) await db.eventTodos.bulkAdd(data.eventTodos);
+        if (data.events)        await db.events.bulkPut(data.events);
+        if (data.locations)     await db.locations.bulkPut(data.locations);
+        if (data.contacts)      await db.contacts.bulkPut(data.contacts);
+        if (data.timeline)      await db.timeline.bulkPut(data.timeline);
+        if (data.equipmentItems)await db.equipmentItems.bulkPut(data.equipmentItems);
+        if (data.equipmentCatalog)await db.equipmentCatalog.bulkPut(data.equipmentCatalog);
+        if (data.payments)      await db.payments.bulkPut(data.payments);
+        if (data.eventTodos)    await db.eventTodos.bulkPut(data.eventTodos);
         UI.toast('Daten importiert', 'success');
         this.navigate('#dashboard');
       } catch (err) {

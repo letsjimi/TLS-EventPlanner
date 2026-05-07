@@ -4,6 +4,16 @@
  */
 
 const UI = {
+  // ── XSS-Schutz ──
+  escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  },
   // ── Toast Benachrichtigungen ──
   toast(message, type = 'info', duration = 3000) {
     const container = document.getElementById('toast-container');
@@ -53,17 +63,35 @@ const UI = {
     lucide.createIcons({ nodes: [modal] });
 
     if (onConfirm) {
-      document.getElementById('modal-confirm').onclick = () => {
-        onConfirm();
-        UI.closeModal();
+      const btn = document.getElementById('modal-confirm');
+      btn.onclick = async () => {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        try {
+          await Promise.resolve(onConfirm());
+          UI.closeModal();
+        } catch (err) {
+          UI.toast('Fehler: ' + (err.message || 'Speichern fehlgeschlagen'), 'error');
+        } finally {
+          btn.disabled = false;
+          btn.style.opacity = '';
+        }
       };
     }
+
+    // Escape zum Schließen (einmalig)
+    this._modalEsc = (e) => { if (e.key === 'Escape') UI.closeModal(); };
+    document.addEventListener('keydown', this._modalEsc, { once: true });
   },
 
   closeModal() {
     document.getElementById('modal-overlay').classList.remove('active');
     const modal = document.querySelector('.modal');
     if (modal) modal.classList.remove('active');
+    if (this._modalEsc) {
+      document.removeEventListener('keydown', this._modalEsc);
+      this._modalEsc = null;
+    }
   },
 
   // ── Confirm Dialog ──

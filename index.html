@@ -15,6 +15,11 @@
   <link rel="stylesheet" href="css/mobile.css" media="(max-width:430px), (-webkit-touch-callout: none)">
   <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
+    }
+  </script>
 </head>
 <body>
   <!-- ═══ SIDEBAR ═══ -->

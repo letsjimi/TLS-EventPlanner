@@ -60,12 +60,15 @@ async function seedDatabase() {
     // Prüfe ob alte Seed-Daten (Juni/August) vorhanden sind
     const oldSeed = await db.events.where('date').between('2026-06-01', '2026-08-31').toArray();
     if (oldSeed.length === 0) return; // Benutzer hat eigene Daten → nicht überschreiben
-    // Alte Seed-Daten gefunden → löschen und neu seeden
+    // Alte Seed-Daten gefunden → alle Seed-relevanten Tabellen löschen und neu seeden
     await db.events.clear();
     await db.locations.clear();
     await db.contacts.clear();
     await db.timeline.clear();
     await db.equipmentItems.clear();
+    await db.equipmentPackages.clear();
+    await db.payments.clear();
+    await db.eventTodos.clear();
   }
 
   // ── Events ──
