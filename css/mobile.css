@@ -334,6 +334,38 @@ body.pwa-standalone .main {
 /* ── Lock-Screen ────────────────────────────── */
 .lock-card { width: 90%; padding: var(--space-xl); }
 
+/* ── Mobile Checkboxes auf 56px ──── */
+.checklist-item .checklist-checkbox,
+.checklist-item input[type="checkbox"] {
+  width: 56px !important;
+  height: 56px !important;
+  border-width: 4px !important;
+  border-radius: 14px !important;
+}
+.checklist-item .checklist-checkbox:checked::after {
+  left: 19px !important;
+  top: 7px !important;
+  width: 12px !important;
+  height: 26px !important;
+  border-width: 0 4px 4px 0 !important;
+}
+
+/* ── Label neben den großen Checkboxes anpassen ──── */
+.checklist-item {
+  min-height: 68px;
+  gap: var(--space-lg) !important;
+  padding: var(--space-sm) 0 !important;
+}
+.checklist-item .checklist-label {
+  font-size: 1.125rem !important;
+  word-break: break-word;
+  padding-right: 8px;
+}
+.checklist-item .btn-icon {
+  width: 48px !important;
+  height: 48px !important;
+}
+
 } /* END @media (max-width: 430px) */
 
 /* ── iPhone SE / Mini Optimierung ────────────── */

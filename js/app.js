@@ -260,20 +260,21 @@ const app = {
       { key: 'cancelled', label: 'Storniert',   color: '#ef4444' }
     ];
 
-    let html = '<div class="kanban">';
+    let html = '<div class="kanban" id="kanban-board">';
     for (const col of columns) {
       const colEvents = events.filter(e => e.status === col.key);
       html += `
-        <div class="kanban-column" data-status="${col.key}">
+        <div class="kanban-column" data-status="${col.key}" ondragover="app._kanbanDragOver(event)" ondragleave="app._kanbanDragLeave(event)" ondrop="app._kanbanDrop(event)">
           <div class="kanban-header">
             <div class="kanban-title" style="color:${col.color}">
               <span style="width:8px;height:8px;border-radius:50%;background:${col.color};display:inline-block"></span>
               ${col.label}
             </div>
-            <span class="kanban-count">${colEvents.length}</span>
+            <span class="kanban-count" data-status="${col.key}">${colEvents.length}</span>
           </div>
+          <div class="kanban-drophere" data-status="${col.key}">Hier ablegen</div>
           ${colEvents.map(e => `
-            <div class="kanban-card" onclick="app.openEvent(${e.id})">
+            <div class="kanban-card" data-event-id="${e.id}" data-current-status="${e.status}" draggable="true" ondragstart="app._kanbanDragStart(event)" ondragend="app._kanbanDragEnd(event)" oncontextmenu="event.preventDefault();app._kanbanContextMenu(${e.id},'${e.status}')" ontouchstart="app._kanbanTouchStart(event,this)" ontouchmove="app._kanbanTouchMove(event,this)" ontouchend="app._kanbanTouchEnd(event,this)">
               <div class="kanban-card-title">${e.clientName || 'Unbekannt'}</div>
               <div class="kanban-card-meta">
                 <span>📅 ${UI.formatDate(e.date)} · ${e.eventType}</span>
@@ -289,7 +290,123 @@ const app = {
   },
 
   initDashboardInteractions() {
-    // Kanban drag & drop würde hier kommen (später)
+    this._kanbanSetup();
+  },
+
+  // ── Desktop Drag & Drop ──
+  _kanbanDragStart(ev) {
+    const card = ev.target.closest('.kanban-card');
+    if (!card) return;
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', card.dataset.eventId);
+    card.classList.add('dragging');
+    this._dragEventId = card.dataset.eventId;
+  },
+  _kanbanDragEnd(ev) {
+    document.querySelectorAll('.kanban-card').forEach(c => c.classList.remove('dragging'));
+    document.querySelectorAll('.kanban-drophere').forEach(d => d.classList.remove('visible'));
+    this._dragEventId = null;
+  },
+  _kanbanDragOver(ev) {
+    ev.preventDefault();
+    const col = ev.currentTarget;
+    col.querySelector('.kanban-drophere')?.classList.add('visible');
+  },
+  _kanbanDragLeave(ev) {
+    const col = ev.currentTarget;
+    col.querySelector('.kanban-drophere')?.classList.remove('visible');
+  },
+  _kanbanContextMenu(id, currentStatus) {
+    // Mobile: long-press = Kontextmenü
+    const nextStatuses = this._getNextStatuses(currentStatus);
+    UI.openModal('Status ändern', `
+      <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
+        ${nextStatuses.map(s => `
+          <button class="btn btn-secondary" style="text-align:left;gap:8px;justify-content:flex-start"
+                  onclick="UI.closeModal();app.changeEventStatus(${id},'${s.key}');app.navigate('#dashboard')">
+            <span style="width:10px;height:10px;border-radius:50%;background:${s.color};display:inline-block"></span> ${s.label}
+          </button>
+        `).join('')}
+      </div>
+    `, null, 'Abbrechen', true);
+  },
+  _getNextStatuses(current) {
+    const all = [
+      { key: 'inquiry', label: 'Anfrage', color: '#3b82f6' },
+      { key: 'offer', label: 'Angebot', color: '#f59e0b' },
+      { key: 'inspected', label: 'Besichtigt', color: '#8b5cf6' },
+      { key: 'confirmed', label: 'Bestätigt', color: '#22c55e' },
+      { key: 'paid', label: 'Bezahlt', color: '#06b6d4' },
+      { key: 'done', label: 'Abgeschlossen', color: '#64748b' },
+      { key: 'cancelled', label: 'Storniert', color: '#ef4444' }
+    ];
+    return all.filter(s => s.key !== current);
+  },
+
+  // ── Touch-Drag (Long-Press + Swipe) ──
+  _kanbanTouchStart(ev, el) {
+    if (this._kanbanTouchTimer) clearTimeout(this._kanbanTouchTimer);
+    this._kanbanTouchTimer = setTimeout(() => {
+      // Long-Press: Card wird "lifted"
+      el.classList.add('touch-dragging');
+      this._kanbanTouchActive = el;
+    }, 500);
+    this._kanbanTouchMoved = false;
+  },
+  _kanbanTouchMove(ev, el) {
+    if (this._kanbanTouchTimer) { clearTimeout(this._kanbanTouchTimer); this._kanbanTouchTimer = null; }
+    if (this._kanbanTouchActive) {
+      // Card bewegt sich mit Finger
+      const touch = ev.touches[0];
+      el.style.position = 'fixed';
+      el.style.zIndex = '9999';
+      el.style.width = el.offsetWidth + 'px';
+      el.style.left = (touch.clientX - el.offsetWidth/2) + 'px';
+      el.style.top = (touch.clientY - 40) + 'px';
+    }
+    this._kanbanTouchMoved = true;
+  },
+  _kanbanTouchEnd(ev, el) {
+    if (this._kanbanTouchTimer) { clearTimeout(this._kanbanTouchTimer); this._kanbanTouchTimer = null; }
+    if (this._kanbanTouchActive) {
+      // Prüfe auf welche Column getroffen wurde
+      const touch = ev.changedTouches[0];
+      const target = document.elementFromPoint(touch.clientX, touch.clientY);
+      const col = target?.closest('.kanban-column');
+      if (col) {
+        const newStatus = col.dataset.status;
+        const eventId = parseInt(el.dataset.eventId);
+        const currentStatus = el.dataset.currentStatus;
+        if (newStatus !== currentStatus) {
+          this.changeEventStatus(eventId, newStatus);
+        }
+      }
+      // Reset styles
+      el.style.position = '';
+      el.style.zIndex = '';
+      el.style.width = '';
+      el.style.left = '';
+      el.style.top = '';
+      el.classList.remove('touch-dragging');
+      this._kanbanTouchActive = null;
+    }
+  },
+
+  _kanbanSetup() {
+    // Setup wird per Inline-Events gemacht
+  },
+
+  async _kanbanDrop(ev) {
+    ev.preventDefault();
+    const col = ev.currentTarget;
+    const newStatus = col.dataset.status;
+    const eventId = parseInt(ev.dataTransfer.getData('text/plain'));
+    if (!eventId || !newStatus) return;
+    const e = await db.events.get(eventId);
+    if (!e || e.status === newStatus) return;
+    await this.changeEventStatus(eventId, newStatus);
+    // Re-render
+    this.navigate('#dashboard');
   },
 
   // ═══════════════════════════════════════════════
@@ -589,9 +706,9 @@ const app = {
   },
 
   renderLocations(locations) {
-    return `<div style="display:flex;flex-direction:column;gap:var(--space-md)">
+    return `<div class="location-list" style="display:flex;flex-direction:column;gap:var(--space-md)">
       ${locations.map((l, i) => `
-        <div style="display:flex;gap:var(--space-md);padding:var(--space-md);background:var(--c-bg);border-radius:var(--radius-md);border:1px solid var(--c-border)">
+        <div class="location-card" style="display:flex;gap:var(--space-md);padding:var(--space-md);background:var(--c-bg);border-radius:var(--radius-md);border:1px solid var(--c-border)">
           <div style="font-size:1.5rem;font-weight:800;color:var(--c-accent);min-width:36px;text-align:center">${i + 1}</div>
           <div style="flex:1">
             <div style="font-weight:700;font-size:1rem;margin-bottom:4px">${l.name}</div>
@@ -958,14 +1075,13 @@ const app = {
                 <input type="checkbox" class="checklist-checkbox" ${item.needed ? 'checked' : ''} onchange="app.toggleEquipmentNeeded(${item.id}, this.checked)">
                 <label class="checklist-label ${item.needed ? '' : 'checked'}">
                   <span style="font-weight:600">${item.name}</span>
-                  <span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">×${item.qty}</span>
+                  <span class="checklist-qty" style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">×${item.qty}</span>
                   ${item.note ? `<span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">— ${item.note}</span>` : ''}
                   ${item.source === 'manual' ? `<span style="color:var(--c-warning);font-size:0.75rem;margin-left:6px">✎</span>` : ''}
                   ${item.sourceVendor || item.isExternal ? `<span style="color:var(--c-accent);font-size:0.75rem;margin-left:6px">${item.isExternal ? '🌐' : '🏢'} ${item.sourceVendor || 'Extern'}</span>` : ''}
                 </label>
-                ${item.needed ? `
-                  <input type="checkbox" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)" title="Gepackt">
-                ` : ''}
+                <input type="checkbox" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)" title="Gepackt" style="${item.needed ? '' : 'display:none'}">
+                <button class="btn btn-icon btn-ghost" onclick="app.editEquipmentQty(${item.id})" title="Anzahl ändern"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
                 <button class="btn btn-icon btn-ghost" onclick="app.deleteEquipmentItem(${item.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
               </div>
             `).join('')}
@@ -1021,34 +1137,63 @@ const app = {
     `;
   },
 
+  // ── Scroll-Restore Helper ──
+  _restoreScroll(savedY) {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: savedY, behavior: 'instant' });
+      // iOS Safari braucht manchmal einen zweiten Versuch
+      setTimeout(() => window.scrollTo({ top: savedY, behavior: 'instant' }), 50);
+    });
+  },
+
   async toggleEquipmentNeeded(id, checked) {
+    const savedY = window.scrollY;
     await db.equipmentItems.update(id, { needed: checked, packed: checked ? false : false });
     const btn = document.querySelector(`input[onchange*="toggleEquipmentNeeded(${id},"]`);
-    if (!btn) return;
+    if (!btn) { this._restoreScroll(savedY); return; }
     const row = btn.closest('.checklist-item');
     const label = row?.querySelector('.checklist-label');
-    // Update progress bar + counter live
-    const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]')].filter(cb => !cb.hasAttribute('title')&&cb.checked).length;
-    const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(cb => cb.checked).length;
+    // Label-Style live togglen (durchgestrichen wenn NICHT needed)
+    if (label) label.classList.toggle('checked', !checked);
+    // "Packed" Checkbox ein-/ausblenden statt Re-Render
+    if (row) {
+      const packedCb = row.querySelector('input[type="checkbox"][title="Gepackt"]');
+      if (packedCb) {
+        packedCb.checked = false;
+        packedCb.style.display = checked ? '' : 'none';
+      }
+      // Wenn !needed, auch den "extern" Badge ausblenden falls vorhanden
+      if (!checked) {
+        btn.checked = false;
+      }
+    }
+    // Progress bar + counter live
+    const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]:not([title="Gepackt"])')].filter(cb => cb.checked).length;
+    const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(cb => cb.checked && cb.offsetParent !== null).length;
     const percent = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
     const progText = document.querySelector('.pack-progress-text');
     const progBar = document.querySelector('.pack-progress-bar');
     if (progText) progText.textContent = `${percent}%`;
     if (progBar) progBar.style.width = `${percent}%`;
+    // Scroll-Position wiederherstellen
+    this._restoreScroll(savedY);
   },
 
   async toggleEquipmentPacked(id, checked) {
+    const savedY = window.scrollY;
     await db.equipmentItems.update(id, { packed: checked });
     const cb = document.querySelector(`input[onchange*="toggleEquipmentPacked(${id},"]`);
     if (cb) cb.checked = checked;
-    // Update progress bar live
-    const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]')].filter(c => !c.hasAttribute('title')&&c.checked).length;
-    const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(c => c.checked).length;
+    // Progress bar live
+    const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]:not([title="Gepackt"])')].filter(c => c.checked).length;
+    const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(c => c.checked && c.offsetParent !== null).length;
     const percent = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
     const progText = document.querySelector('.pack-progress-text');
     const progBar = document.querySelector('.pack-progress-bar');
     if (progText) progText.textContent = `${percent}%`;
     if (progBar) progBar.style.width = `${percent}%`;
+    // Scroll-Position wiederherstellen
+    this._restoreScroll(savedY);
   },
 
   async deleteEquipmentItem(id) {
@@ -1073,6 +1218,47 @@ const app = {
         requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
       }
     });
+  },
+
+  /* ── Equipment Qty inline edit ── */
+  async editEquipmentQty(id) {
+    const savedY = window.scrollY;
+    const item = await db.equipmentItems.get(id);
+    if (!item) return;
+    const currentQty = item.qty || 1;
+
+    UI.openModal('Anzahl ändern', `
+      <div style="text-align:center;padding:var(--space-lg)">
+        <div class="form-label" style="font-size:1.1rem;margin-bottom:var(--space-xl);font-weight:600">${item.name}</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:var(--space-lg)">
+          <button type="button" class="btn btn-secondary" style="width:64px;height:64px;font-size:1.75rem;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center" onclick="app._stepQty(-1)">−</button>
+          <div id="qty-display" style="font-size:2.25rem;font-weight:800;min-width:80px;color:var(--c-text)">${currentQty}</div>
+          <input type="hidden" id="qty-value" value="${currentQty}">
+          <button type="button" class="btn btn-secondary" style="width:64px;height:64px;font-size:1.75rem;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center" onclick="app._stepQty(1)">+</button>
+        </div>
+      </div>
+    `, async () => {
+      const newQty = parseInt(document.getElementById('qty-value').value, 10) || 1;
+      await db.equipmentItems.update(id, { qty: newQty });
+      // DOM live updaten statt Re-Render
+      const row = document.querySelector(`button[onclick*="editEquipmentQty(${id}"]`).closest('.checklist-item');
+      if (row) {
+        const qtySpan = row.querySelector('.checklist-qty');
+        if (qtySpan) qtySpan.textContent = `×${newQty}`;
+      }
+      UI.toast('Anzahl aktualisiert', 'success');
+      this._restoreScroll(savedY);
+    });
+  },
+
+  _stepQty(delta) {
+    const inp = document.getElementById('qty-value');
+    const disp = document.getElementById('qty-display');
+    if (!inp || !disp) return;
+    let v = parseInt(inp.value, 10) || 0;
+    v = Math.max(0, v + delta);
+    inp.value = v;
+    disp.textContent = v;
   },
 
   async autoFillEquipment() {
@@ -2094,7 +2280,7 @@ const app = {
     }).join('');
 
     return `
-      <div class="card mb-3">
+      <div class="card mb-3 ${todos.length === 0 ? 'print-hide' : ''}">
         <div class="card-header">
           <div class="card-title"><i data-lucide="check-square"></i>TODOs</div>
           <button class="btn btn-sm btn-primary" onclick="app.addEventTodo()"><i data-lucide="plus" style="width:14px;height:14px"></i>Neu</button>
@@ -2229,60 +2415,81 @@ const app = {
   // VERFÜGBARKEITSKALENDER
   // ═══════════════════════════════════════════════
   async showAvailabilityCalendar(year = new Date().getFullYear(), month = new Date().getMonth()) {
+    // Normale Werte — JavaScript new Date(year, 13) → nächstes Jahr funktioniert
     const startOfMonth = new Date(year, month, 1);
-    const endOfMonth = new Date(year, month + 1, 0);
+    const displayYear = startOfMonth.getFullYear();
+    const displayMonth = startOfMonth.getMonth();
+    const endOfMonth = new Date(displayYear, displayMonth + 1, 0);
     const daysInMonth = endOfMonth.getDate();
     const firstDay = startOfMonth.getDay(); // 0=Su, 1=Mo...
 
-    // Events laden
+    // Alle Events laden
     const allEvents = await db.events.toArray();
+
+    // Hilfsfunktion: ISO-String YYYY-MM-DD erstellen OHNE UTC-Shift
+    const toLocalISO = (y, m, d) => {
+      const s = String(y);
+      const sm = String(m + 1).padStart(2, '0');
+      const sd = String(d).padStart(2, '0');
+      return `${s}-${sm}-${sd}`;
+    };
+
     const eventsInMonth = allEvents.filter(ev => {
-      const d = new Date(ev.date + 'T00:00:00');
-      return d.getFullYear() === year && d.getMonth() === month;
+      if (!ev.date) return false;
+      const [ey, em, ed] = ev.date.split('-').map(Number);
+      return ey === displayYear && em === displayMonth + 1;
     });
 
     const calendarDays = [];
-    // Leere Tage im Vormonat
-    for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) calendarDays.push(`<div class="cal-day empty"></div>`);
+    // Leere Tage im Vormonat (Montags-start)
+    const padding = firstDay === 0 ? 6 : firstDay - 1;
+    for (let i = 0; i < padding; i++) calendarDays.push(`<div class="cal-day empty"></div>`);
 
     for (let d = 1; d <= daysInMonth; d++) {
-      const dayEvents = eventsInMonth.filter(ev => new Date(ev.date + 'T00:00:00').getDate() === d);
+      const dateStr = toLocalISO(displayYear, displayMonth, d);
+      const dayEvents = eventsInMonth.filter(ev => ev.date === dateStr);
       const eventDots = dayEvents.map(ev => {
         const color = { inquiry:'#3b82f6', offer:'#eab308', inspected:'#a855f7', confirmed:'#22c55e', paid:'#0ea5e9', done:'#64748b', cancelled:'#ef4444' }[ev.status] || '#9ca3af';
         return `<span class="cal-dot" style="background:${color}" title="${ev.clientName} (${ev.status})"></span>`;
       }).join('');
-      const isToday = new Date().toISOString().slice(0,10) === new Date(year, month, d).toISOString().slice(0,10);
-      calendarDays.push(`
-        <div class="cal-day ${isToday ? 'today' : ''}" onclick="app.showDayEvents(${year},${month},${d})">
-          <span style="font-size:0.75rem;font-weight:600;color:var(--c-text-2)">${d}</span>
-          <div style="display:flex;gap:2px;flex-wrap:wrap;margin-top:3px;justify-content:center">${eventDots}</div>
-        </div>`);
+      const isToday = new Date().toISOString().slice(0,10) === dateStr;
+      const hasMultiple = dayEvents.length > 1;
+      if (dayEvents.length > 0) {
+        calendarDays.push(`
+          <div class="cal-day ${isToday ? 'today' : ''} ${hasMultiple ? 'multiple' : ''}" onclick="app.showDayEvents(${displayYear},${displayMonth},${d})">
+            <span style="font-size:0.75rem;font-weight:600;color:var(--c-text-2)">${d}</span>
+            <div style="display:flex;gap:2px;flex-wrap:wrap;margin-top:3px;justify-content:center">${eventDots}</div>
+          </div>`);
+      } else {
+        // Leerer Tag → Klick = neuer Auftrag mit diesem Datum
+        calendarDays.push(`
+          <div class="cal-day ${isToday ? 'today' : ''}" onclick="app.createEventFromCalendar('${dateStr}')">
+            <span style="font-size:0.75rem;font-weight:600;color:var(--c-text-2)">${d}</span>
+          </div>`);
+      }
     }
 
     const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-    // Korrigierte Anzeige bei Monatsüberlauf (z.B. month = -1 → Dez Vorjahr)
-    const displayMonth = (month % 12 + 12) % 12;
-    const displayYear = year + Math.floor(month / 12);
 
     const html = `
       <div class="page-header" style="flex-wrap:wrap;gap:var(--space-sm)">
-        <div><h1 class="page-title">Verfügbarkeitskalender</h1><p class="page-subtitle">Auftragsübersicht</p></div>
+        <div><h1 class="page-title">Verfügbarkeitskalender</h1><p class="page-subtitle">Auftragsübersicht · Rot = Doppelbuchung</p></div>
         <div style="display:flex;gap:var(--space-sm);align-items:center">
-          <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${year},${month - 1})">◀</button>
+          <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${displayYear},${displayMonth - 1})">◀</button>
           <span style="font-weight:600">${monthNames[displayMonth]} ${displayYear}</span>
-          <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${year},${month + 1})">▶</button>
+          <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${displayYear},${displayMonth + 1})">▶</button>
           <button class="btn btn-secondary btn-sm" onclick="app.navigate('#dashboard')">Zurück</button>
         </div>
       </div>
       <div class="card">
-        <div class="cal-grid" style="display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;text-align:center;font-size:0.8rem">
-          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Mo</div>
-          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Di</div>
-          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Mi</div>
-          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Do</div>
-          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Fr</div>
-          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">Sa</div>
-          <div class="cal-header" style="padding:6px;font-weight:600;color:var(--c-text-3)">So</div>
+        <div class="cal-grid">
+          <div class="cal-header">Mo</div>
+          <div class="cal-header">Di</div>
+          <div class="cal-header">Mi</div>
+          <div class="cal-header">Do</div>
+          <div class="cal-header">Fr</div>
+          <div class="cal-header">Sa</div>
+          <div class="cal-header">So</div>
           ${calendarDays.join('')}
         </div>
         <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md);flex-wrap:wrap;font-size:0.8rem;color:var(--c-text-3)">
@@ -2290,6 +2497,7 @@ const app = {
           <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;margin-right:4px"></span>Angebot</span>
           <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:4px"></span>Bestätigt</span>
           <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:4px"></span>Storniert</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e94560;margin-right:4px"></span>2+ Events</span>
         </div>
       </div>`;
 
@@ -2297,6 +2505,39 @@ const app = {
     container.innerHTML = html;
     lucide.createIcons();
     window.scrollTo({ top: 0 });
+  },
+
+  // Klick auf leeren Kalendertag → sofort neuer Auftrag mit Datum
+  async createEventFromCalendar(dateStr) {
+    const fields = [
+      { name: 'clientName', label: 'Kunde / Event', required: true },
+      { name: 'eventType', label: 'Art', type: 'select', options: [
+        { value: 'Hochzeit', label: 'Hochzeit' },
+        { value: 'Firmenfeier', label: 'Firmenfeier' },
+        { value: 'Konzert', label: 'Konzert' },
+        { value: 'Geburtstag', label: 'Geburtstag' },
+        { value: 'Kirche', label: 'Kirche' },
+        { value: 'Club', label: 'Club / Disco' },
+        { value: 'Outdoor', label: 'Open-Air / Outdoor' },
+        { value: 'Sonstiges', label: 'Sonstiges' }
+      ]},
+      { name: 'date', label: 'Datum', type: 'date', value: dateStr },
+      { name: 'startTime', label: 'Beginn', placeholder: 'z.B. 19:00' },
+      { name: 'personCount', label: 'Personenanzahl', type: 'number', placeholder: '0' },
+      { name: 'totalPrice', label: 'Preis (€)', type: 'number', placeholder: '0.00', step: '0.01' }
+    ];
+    UI.openModal('Neuer Auftrag am ' + UI.formatDate(dateStr), `<form id="quick-event-form">${UI.form(fields)}</form>`, async () => {
+      const data = UI.getFormData(document.getElementById('quick-event-form'));
+      // Generate order number
+      const count = await db.events.count();
+      const now = new Date();
+      data.orderNumber = 'TLS-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(count + 1).padStart(3,'0');
+      data.status = 'inquiry';
+      data.date = dateStr;
+      const id = await db.events.add(data);
+      UI.toast('Auftrag erstellt', 'success');
+      this.navigate('#planner/' + id);
+    });
   },
 
   async showDayEvents(year, month, day) {
