@@ -5,6 +5,21 @@
 
 const db = new Dexie('TLS_EventManager_v2');
 
+db.version(3).stores({
+  events: '++id, orderNumber, status, eventType, date, clientName, totalPrice',
+  locations: '++id, eventId, sortOrder',
+  contacts: '++id, eventId, role, name',
+  timeline: '++id, eventId, time, sortOrder',
+  equipmentItems: '++id, eventId, category, name, needed',
+  equipmentCatalog: '++id, category, name, tags, isExternal',
+  equipmentPackages: '++id, name, tags',
+  payments: '++id, eventId, type, status',
+  settings: 'key',
+  eventTodos: '++id, eventId, dueDate, done'
+}).upgrade(tx => {
+  // Kein Schema-Change, nur Version-Bump für Seed-Refresh
+});
+
 db.version(2).stores({
   events: '++id, orderNumber, status, eventType, date, clientName, totalPrice',
   locations: '++id, eventId, sortOrder',
@@ -41,13 +56,23 @@ db.version(1).stores({
 
 async function seedDatabase() {
   const count = await db.events.count();
-  if (count > 0) return; // Nur beim ersten Start
+  if (count > 0) {
+    // Prüfe ob alte Seed-Daten (Juni/August) vorhanden sind
+    const oldSeed = await db.events.where('date').between('2026-06-01', '2026-08-31').toArray();
+    if (oldSeed.length === 0) return; // Benutzer hat eigene Daten → nicht überschreiben
+    // Alte Seed-Daten gefunden → löschen und neu seeden
+    await db.events.clear();
+    await db.locations.clear();
+    await db.contacts.clear();
+    await db.timeline.clear();
+    await db.equipmentItems.clear();
+  }
 
   // ── Events ──
   await db.events.bulkAdd([
     {
       orderNumber: 'TLS-2026-001',
-      date: '2026-06-15',
+      date: '2026-05-10',
       eventType: 'Hochzeit',
       clientName: 'Schneider & Müller',
       locations: 'Kirche St. Peter → Festhalle Rüsselsheim',
@@ -63,7 +88,7 @@ async function seedDatabase() {
     },
     {
       orderNumber: 'TLS-2026-002',
-      date: '2026-07-22',
+      date: '2026-05-20',
       eventType: 'Firmenfeier',
       clientName: 'ABC GmbH Frankfurt',
       locations: 'Kongresszentrum Frankfurt',
@@ -79,7 +104,7 @@ async function seedDatabase() {
     },
     {
       orderNumber: 'TLS-2026-003',
-      date: '2026-08-05',
+      date: '2026-06-05',
       eventType: 'Konzert',
       clientName: 'Musikverein Darmstadt',
       locations: 'Jazzclub Darmstadt',
