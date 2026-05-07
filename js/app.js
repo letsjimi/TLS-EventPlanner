@@ -1072,7 +1072,7 @@ const app = {
             <div class="card-header"><div class="card-title">${cat}</div></div>
             ${byCat[cat].map(item => `
               <div class="checklist-item">
-                <input type="checkbox" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)" title="Gepackt">
+                <input type="checkbox" id="eq-${item.id}" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)" title="Gepackt">
                 <label class="checklist-label ${item.packed ? 'checked' : ''}">
                   <span style="font-weight:600">${item.name}</span>
                   <span class="checklist-qty" style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">×${item.qty}</span>
@@ -1181,16 +1181,24 @@ const app = {
   async toggleEquipmentPacked(id, checked) {
     const savedY = window.scrollY;
     await db.equipmentItems.update(id, { packed: checked });
-    const cb = document.querySelector(`input[onchange*="toggleEquipmentPacked(${id},"]`);
-    if (cb) cb.checked = checked;
-    // Progress bar live
-    const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]:not([title="Gepackt"])')].filter(c => c.checked).length;
-    const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(c => c.checked && c.offsetParent !== null).length;
-    const percent = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
+    const cb = document.querySelector(`input[id="eq-${id}"]`);
+    if (cb) {
+      cb.checked = checked;
+      const label = cb.closest('.checklist-item')?.querySelector('.checklist-label');
+      if (label) label.classList.toggle('checked', checked);
+    }
+    // Progress bar live — alle Items zählen als needed
+    const totalItems = document.querySelectorAll('.checklist-item input[type=checkbox]').length;
+    const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox]')].filter(c => c.checked).length;
+    const percent = totalItems > 0 ? Math.round((totalPacked / totalItems) * 100) : 0;
     const progText = document.querySelector('.pack-progress-text');
     const progBar = document.querySelector('.pack-progress-bar');
+    const packCount = document.querySelector('.pack-packed-count');
+    const needCount = document.querySelector('.pack-needed-count');
     if (progText) progText.textContent = `${percent}%`;
     if (progBar) progBar.style.width = `${percent}%`;
+    if (packCount) packCount.textContent = totalPacked;
+    if (needCount) needCount.textContent = totalItems;
     // Scroll-Position wiederherstellen
     this._restoreScroll(savedY);
   },
@@ -1205,13 +1213,17 @@ const app = {
       if (row) {
         row.remove();
         // Progress aktualisieren
-        const totalNeeded = [...document.querySelectorAll('.checklist-item input[type=checkbox]')].filter(c => !c.hasAttribute('title')&&c.checked).length;
-        const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox][title="Gepackt"]')].filter(c => c.checked).length;
-        const percent = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
+        const totalItems = document.querySelectorAll('.checklist-item input[type=checkbox]').length;
+        const totalPacked = [...document.querySelectorAll('.checklist-item input[type=checkbox]')].filter(c => c.checked).length;
+        const percent = totalItems > 0 ? Math.round((totalPacked / totalItems) * 100) : 0;
         const progText = document.querySelector('.pack-progress-text');
         const progBar = document.querySelector('.pack-progress-bar');
+        const packCount = document.querySelector('.pack-packed-count');
+        const needCount = document.querySelector('.pack-needed-count');
         if (progText) progText.textContent = `${percent}%`;
         if (progBar) progBar.style.width = `${percent}%`;
+        if (packCount) packCount.textContent = totalPacked;
+        if (needCount) needCount.textContent = totalItems;
       } else {
         this.navigate(`#equipment/${this.currentEventId}`);
         requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));

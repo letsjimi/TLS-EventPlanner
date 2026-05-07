@@ -701,14 +701,12 @@ body {
   border-radius: var(--radius-md);
   padding: var(--space-md);
   margin-bottom: var(--space-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
+  cursor: default;
+  transition: box-shadow var(--transition-fast);
 }
 
 .kanban-card:hover {
-  border-color: var(--c-accent);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .kanban-card-title {
@@ -836,8 +834,8 @@ body {
 
 .checklist-checkbox {
   appearance: none;
-  width: 48px; height: 48px;
-  border: 3px solid var(--c-border);
+  width: 22px; height: 22px;
+  border: 2px solid var(--c-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
   position: relative;
@@ -853,16 +851,17 @@ body {
 .checklist-checkbox:checked::after {
   content: '';
   position: absolute;
-  left: 15px; top: 5px;
-  width: 10px; height: 22px;
+  left: 6px; top: 2px;
+  width: 5px; height: 10px;
   border: solid white;
-  border-width: 0 3px 3px 0;
+  border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
 
 .checklist-label {
   flex: 1;
   font-size: 1rem;
+  cursor: default;
 }
 
 .checklist-label.checked {
