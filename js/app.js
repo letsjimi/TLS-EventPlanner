@@ -75,7 +75,15 @@ const app = {
       catalog:   () => this.openCatalogEditorFromNav(),
       calculation: () => this.renderCalculation(subPage),
       market:    () => this.renderMarket(),
-      calendar:  () => this.showAvailabilityCalendar(),
+      calendar:  () => {
+        let cy = new Date().getFullYear(), cm = new Date().getMonth();
+        if (subPage) {
+          const parts = subPage.split('/');
+          if (parts[0]) cy = parseInt(parts[0]);
+          if (parts[1]) cm = parseInt(parts[1]);
+        }
+        return this.showAvailabilityCalendar(cy, cm);
+      },
       settings:  () => this.renderSettings()
     };
 
@@ -642,6 +650,9 @@ const app = {
         <div class="page-header-actions">
           <button class="btn btn-secondary btn-sm" onclick="app.generateOfferPDF(${e.id})" title="Angebot als PDF">
             <i data-lucide="file-text" style="width:16px;height:16px"></i><span>Angebot</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="app.exportEventToCalendar(${e.id})" title="In Kalender exportieren">
+            <i data-lucide="calendar-plus" style="width:16px;height:16px"></i><span>Kalender</span>
           </button>
           <button class="btn btn-secondary btn-sm" onclick="app.sendEventEmail(${e.id})" title="Per E-Mail versenden">
             <i data-lucide="mail" style="width:16px;height:16px"></i><span>E-Mail</span>
@@ -2464,9 +2475,9 @@ const app = {
       <div class="page-header" style="flex-wrap:wrap;gap:var(--space-sm)">
         <div><h1 class="page-title">Verfügbarkeitskalender</h1><p class="page-subtitle">Auftragsübersicht · Rot = Doppelbuchung</p></div>
         <div style="display:flex;gap:var(--space-sm);align-items:center">
-          <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${displayYear},${displayMonth - 1})">◀</button>
+          <button class="btn btn-ghost" onclick="app.navigate('#calendar/${displayYear}/${displayMonth - 1}')">◀</button>
           <span style="font-weight:600">${monthNames[displayMonth]} ${displayYear}</span>
-          <button class="btn btn-ghost" onclick="app.showAvailabilityCalendar(${displayYear},${displayMonth + 1})">▶</button>
+          <button class="btn btn-ghost" onclick="app.navigate('#calendar/${displayYear}/${displayMonth + 1}')">▶</button>
           <button class="btn btn-secondary btn-sm" onclick="app.navigate('#dashboard')">Zurück</button>
         </div>
       </div>
@@ -2542,6 +2553,63 @@ const app = {
       </div>
     `).join(''), null, 'narrow');
     lucide.createIcons();
+  },
+
+  // ═══════════════════════════════════════════════
+  // KALENDER EXPORT (iCal .ics)
+  // ═══════════════════════════════════════════════
+  async exportEventToCalendar(eventId) {
+    const e = await db.events.get(eventId);
+    if (!e) return;
+    const l = await db.locations.where('eventId').equals(eventId).first();
+    const date = e.date || new Date().toISOString().slice(0,10);
+    const startTime = e.startTime || '08:00';
+    const endTime = e.endTime || '23:59';
+
+    const [h, m] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+
+    // ISO 8601 UTC-Zeiten für iCal
+    const fmt = (y,mo,d,hr,min) => {
+      return `${String(y).padStart(4,'0')}${String(mo).padStart(2,'0')}${String(d).padStart(2,'0')}T${String(hr).padStart(2,'0')}${String(min).padStart(2,'0')}00Z`;
+    };
+    const [y, mo, d] = date.split('-').map(Number);
+    const dtStart = fmt(y, mo, d, h, m);
+    const dtEnd   = fmt(y, mo, d, eh || h + 2, em || m);
+
+    const uid = `tls-${eventId}-${e.orderNumber}@tls-events.de`;
+    const description = `Auftrag: ${e.orderNumber}\\nTyp: ${e.eventType}\\nStatus: ${e.statusLabel || e.status}\\nPreis: ${UI.euro(e.totalPrice || 0)}`;
+    const location = l ? `${l.name}\\n${l.address || ''}` : e.locations || 'TLS Event';
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:TLEventManager',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTART:${dtStart}`,
+      `DTEND:${dtEnd}`,
+      `SUMMARY:${e.clientName} (${e.eventType})`,
+      `DESCRIPTION:${description}`,
+      `LOCATION:${location.replace(/\\n/g, '\\\\n')}`,
+      `STATUS:${e.status === 'cancelled' ? 'CANCELLED' : 'CONFIRMED'}`,
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\\r\\n');
+
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${e.orderNumber || 'TLS-Event'}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    UI.toast('Event als .ics exportiert – importiere es in Outlook / Google / Apple Kalender', 'success');
   },
 
   // ═══════════════════════════════════════════════
