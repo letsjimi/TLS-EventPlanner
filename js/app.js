@@ -2486,11 +2486,11 @@ const app = {
     const html = `
       <div class="page-header" style="flex-wrap:wrap;gap:var(--space-sm)">
         <div><h1 class="page-title">Verfügbarkeitskalender</h1><p class="page-subtitle">Auftragsübersicht · Rot = Doppelbuchung</p></div>
-        <div style="display:flex;gap:var(--space-sm);align-items:center">
-          <button class="btn btn-ghost" onclick="app.navigate('#calendar/${displayYear}/${displayMonth - 1}')">◀</button>
-          <span style="font-weight:600">${monthNames[displayMonth]} ${displayYear}</span>
-          <button class="btn btn-ghost" onclick="app.navigate('#calendar/${displayYear}/${displayMonth + 1}')">▶</button>
-          <button class="btn btn-secondary btn-sm" onclick="app.navigate('#dashboard')">Zurück</button>
+        <div style="display:flex;align-items:center;gap:0;margin-left:auto">
+          <button class="btn btn-ghost" style="min-width:40px" onclick="app.navigate('#calendar/${displayYear}/${displayMonth - 1}')" title="Vorheriger Monat">◀</button>
+          <span style="font-weight:600;width:140px;text-align:center;white-space:nowrap">${monthNames[displayMonth]} ${displayYear}</span>
+          <button class="btn btn-ghost" style="min-width:40px" onclick="app.navigate('#calendar/${displayYear}/${displayMonth + 1}')" title="Nächster Monat">▶</button>
+          <button class="btn btn-secondary btn-sm" style="margin-left:var(--space-sm)" onclick="app.navigate('#dashboard')">Zurück</button>
         </div>
       </div>
       <div class="card">
