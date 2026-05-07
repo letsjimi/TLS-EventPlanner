@@ -2485,10 +2485,7 @@ const app = {
         </div>
       </div>`;
 
-    const container = document.getElementById('page-content');
-    container.innerHTML = html;
-    lucide.createIcons();
-    window.scrollTo({ top: 0 });
+    return html;
   },
 
   // Klick auf leeren Kalendertag → sofort neuer Auftrag mit Datum
@@ -2525,12 +2522,12 @@ const app = {
   },
 
   async showDayEvents(year, month, day) {
-    const dateStr = new Date(year, month, day).toISOString().slice(0, 10);
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const events = (await db.events.toArray()).filter(ev => ev.date === dateStr);
     if (!events.length) return;
     UI.toast(`${events.length} Event${events.length > 1 ? 's' : ''} am ${UI.formatDate(dateStr)}`, 'info');
     // Anzeige im Modal
-    UI.modal('Events am ' + UI.formatDate(dateStr), events.map(e => `
+    UI.openModal('Events am ' + UI.formatDate(dateStr), events.map(e => `
       <div style="padding:8px 0;border-bottom:1px solid var(--c-border);cursor:pointer" onclick="UI.closeModal();app.navigate('#planner/${e.id}')">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>${e.clientName}</strong>
