@@ -1053,8 +1053,8 @@ const app = {
     const byCatOwn = groupByCat(ownItems);
     const byCatExt = groupByCat(extItems);
 
-    const totalNeeded = items.filter(i => i.needed).length;
-    const totalPacked = items.filter(i => i.needed && i.packed).length;
+    const totalNeeded = items.length;
+    const totalPacked = items.filter(i => i.packed).length;
     const progress = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
 
     // Pakete laden
@@ -1072,15 +1072,14 @@ const app = {
             <div class="card-header"><div class="card-title">${cat}</div></div>
             ${byCat[cat].map(item => `
               <div class="checklist-item">
-                <input type="checkbox" class="checklist-checkbox" ${item.needed ? 'checked' : ''} onchange="app.toggleEquipmentNeeded(${item.id}, this.checked)">
-                <label class="checklist-label ${item.needed ? '' : 'checked'}">
+                <input type="checkbox" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)" title="Gepackt">
+                <label class="checklist-label ${item.packed ? 'checked' : ''}">
                   <span style="font-weight:600">${item.name}</span>
                   <span class="checklist-qty" style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">×${item.qty}</span>
                   ${item.note ? `<span style="color:var(--c-text-3);font-size:0.8125rem;margin-left:8px">— ${item.note}</span>` : ''}
                   ${item.source === 'manual' ? `<span style="color:var(--c-warning);font-size:0.75rem;margin-left:6px">✎</span>` : ''}
                   ${item.sourceVendor || item.isExternal ? `<span style="color:var(--c-accent);font-size:0.75rem;margin-left:6px">${item.isExternal ? '🌐' : '🏢'} ${item.sourceVendor || 'Extern'}</span>` : ''}
                 </label>
-                <input type="checkbox" class="checklist-checkbox" ${item.packed ? 'checked' : ''} onchange="app.toggleEquipmentPacked(${item.id}, this.checked)" title="Gepackt" style="${item.needed ? '' : 'display:none'}">
                 <button class="btn btn-icon btn-ghost" onclick="app.editEquipmentQty(${item.id})" title="Anzahl ändern"><i data-lucide="pencil" style="width:14px;height:14px"></i></button>
                 <button class="btn btn-icon btn-ghost" onclick="app.deleteEquipmentItem(${item.id})"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
               </div>

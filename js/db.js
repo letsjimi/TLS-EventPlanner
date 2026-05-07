@@ -132,7 +132,15 @@ async function seedDatabase() {
     { eventId: 1, sortOrder: 2, name: 'Festhalle Rüsselsheim', address: 'Am Festplatz 5, 65428 Rüsselsheim',
       km: 0, setupTime: '14:00 - 16:00', soundcheck: '16:00 - 17:00',
       notes: 'Empfang ab 17:00 | Dinner 18:00 | Party ab 20:00 | Ende 01:00',
-      contactName: 'Verwalter Schmidt', contactPhone: '06142/98765' }
+      contactName: 'Verwalter Schmidt', contactPhone: '06142/98765' },
+    { eventId: 2, sortOrder: 1, name: 'Kongresszentrum Frankfurt', address: 'Ludwig-Erhard-Anlage 1, 60327 Frankfurt',
+      km: 25, setupTime: '10:00 - 12:00', soundcheck: '12:00 - 13:00',
+      notes: 'LED-Wall mit Firmenlogo | 200 Gäste | Parkplatz B3',
+      contactName: 'Frau Weber', contactPhone: '069/1234567' },
+    { eventId: 3, sortOrder: 1, name: 'Jazzclub Darmstadt', address: 'Rheinstraße 15, 64283 Darmstadt',
+      km: 35, setupTime: '16:00 - 18:00', soundcheck: '18:00 - 19:00',
+      notes: '4-Kanal Mischpult ausreichend | Line-In bereit',
+      contactName: 'Herr Krause', contactPhone: '06151/987654' }
   ]);
 
   // ── Timeline (für Event 001) ──
@@ -150,6 +158,23 @@ async function seedDatabase() {
     { eventId: 1, time: '20:00', title: 'Party / DJ', detail: 'Tanzmusik, Moderation', location: 'Festhalle', duration: '5h', crew: 'Techniker', done: false },
     { eventId: 1, time: '01:00', title: 'Abbau Festhalle', detail: 'Alles einpacken', location: 'Festhalle', duration: '1,5h', crew: 'Techniker + Helfer', done: false },
     { eventId: 1, time: '03:00', title: 'Rückkehr TLS', detail: 'Equipment abladen', location: 'TLS Lager', duration: '1h', crew: 'Techniker + Helfer', done: false }
+  ]);
+
+  // ── Timeline (für Event 002) ──
+  await db.timeline.bulkAdd([
+    { eventId: 2, time: '10:00', title: 'Aufbau', detail: 'PA, Licht, LED-Wall', location: 'Kongresszentrum', duration: '2h', crew: 'Techniker + Helfer', done: false },
+    { eventId: 2, time: '12:00', title: 'Soundcheck', detail: 'Full-System', location: 'Kongresszentrum', duration: '1h', crew: 'Techniker', done: false },
+    { eventId: 2, time: '18:00', title: 'Empfang', detail: 'Hintergrundmusik', location: 'Kongresszentrum', duration: '2h', crew: 'Techniker', done: false },
+    { eventId: 2, time: '20:00', title: 'Firmenfeier', detail: 'DJ-Set, Mikros für Reden', location: 'Kongresszentrum', duration: '4h', crew: 'Techniker', done: false },
+    { eventId: 2, time: '00:00', title: 'Abbau', detail: 'Equipment einpacken', location: 'Kongresszentrum', duration: '1,5h', crew: 'Techniker + Helfer', done: false }
+  ]);
+
+  // ── Timeline (für Event 003) ──
+  await db.timeline.bulkAdd([
+    { eventId: 3, time: '16:00', title: 'Aufbau', detail: 'PA, Licht', location: 'Jazzclub', duration: '2h', crew: 'Techniker', done: false },
+    { eventId: 3, time: '18:00', title: 'Soundcheck', detail: 'Band-Line-Check', location: 'Jazzclub', duration: '1h', crew: 'Techniker', done: false },
+    { eventId: 3, time: '20:00', title: 'Konzert', detail: 'Bühnenshow', location: 'Jazzclub', duration: '3h', crew: 'Techniker', done: false },
+    { eventId: 3, time: '23:30', title: 'Abbau', detail: 'Equipment einpacken', location: 'Jazzclub', duration: '1h', crew: 'Techniker', done: false }
   ]);
 
   // ── Contacts (für Event 001) ──
@@ -175,6 +200,40 @@ async function seedDatabase() {
     { eventId: 1, role: 'TLS-Helfer', name: 'Max Mustermann', phone: '0176/444333',
       email: 'max@mail.de', responsibility: 'Equipment-Transport, Aufbau-Hilfe',
       notes: 'Hat Führerschein Klasse C1', availability: 'Jederzeit' }
+  ]);
+
+  // ── Contacts (für Event 002) ──
+  await db.contacts.bulkAdd([
+    { eventId: 2, role: 'Kunde / Auftraggeber', name: 'ABC GmbH - Herr Becker', phone: '069/2345678',
+      email: 'events@abc-gmbh.de', responsibility: 'Vertrag, Rechnung, Zahlung',
+      notes: 'Firmen-CI beachten | Logo auf LED-Wall gewünscht', availability: 'Mo-Fr 9-18h' },
+    { eventId: 2, role: 'Location-Kontakt', name: 'Frau Weber', phone: '069/1234567',
+      email: 'events@kongresszentrum.de', responsibility: 'Technische Anschlüsse, Parkplätze',
+      notes: 'Parkplatz B3 reserviert | Cateringbereich EG', availability: 'Bürozeiten' }
+  ]);
+
+  // ── Contacts (für Event 003) ──
+  await db.contacts.bulkAdd([
+    { eventId: 3, role: 'Kunde / Veranstalter', name: 'Musikverein Darmstadt - Frau Lenz', phone: '06151/765432',
+      email: 'info@musikverein-darmstadt.de', responsibility: 'Vertrag, Presse, Zahlung',
+      notes: 'Line-In vorhanden | 4-Kanal reicht', availability: 'Jederzeit' }
+  ]);
+
+  // ── Contacts (für Event 002) ──
+  await db.contacts.bulkAdd([
+    { eventId: 2, role: 'Kunde / Auftraggeber', name: 'ABC GmbH - Herr Becker', phone: '069/2345678',
+      email: 'events@abc-gmbh.de', responsibility: 'Vertrag, Rechnung, Zahlung',
+      notes: 'Firmen-CI beachten | Logo auf LED-Wall gewünscht', availability: 'Mo-Fr 9-18h' },
+    { eventId: 2, role: 'Location-Kontakt', name: 'Frau Weber', phone: '069/1234567',
+      email: 'events@kongresszentrum.de', responsibility: 'Technische Anschlüsse, Parkplätze',
+      notes: 'Parkplatz B3 reserviert | Cateringbereich EG', availability: 'Bürozeiten' }
+  ]);
+
+  // ── Contacts (für Event 003) ──
+  await db.contacts.bulkAdd([
+    { eventId: 3, role: 'Kunde / Veranstalter', name: 'Musikverein Darmstadt - Frau Lenz', phone: '06151/765432',
+      email: 'info@musikverein-darmstadt.de', responsibility: 'Vertrag, Presse, Zahlung',
+      notes: 'Line-In vorhanden | 4-Kanal reicht', availability: 'Jederzeit' }
   ]);
 
   // ── Equipment Catalog (TLS Lager) ──
@@ -242,6 +301,30 @@ async function seedDatabase() {
     { eventId: 1, category: 'Zubehör', name: 'Gaffa-Tape', qty: 3, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 2 },
     { eventId: 1, category: 'Zubehör', name: 'Kabelbinder', qty: 50, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 1 },
     { eventId: 1, category: 'Zubehör', name: 'Batterien AA / 9V', qty: 20, needed: true, packed: false, note: 'Für Funkmikros', source: 'catalog', isExternal: false, priceDay: 3 }
+  ]);
+
+  // ── Equipment Items (für Event 002 – Firmenfeier ABC GmbH) ──
+  await db.equipmentItems.bulkAdd([
+    { eventId: 2, category: 'Mischpult',  name: 'dB Technologies M12A (Top)', qty: 4,  needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 24 },
+    { eventId: 2, category: 'Lautsprecher', name: 'dB Technologies S18A (Sub)', qty: 2,  needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 42.5 },
+    { eventId: 2, category: 'Licht', name: 'LED Washer RGB (36x)', qty: 8, needed: true, packed: false, note: 'DMX-Kabel', source: 'catalog', isExternal: false, priceDay: 3 },
+    { eventId: 2, category: 'Licht', name: 'DMX-Controller', qty: 1, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 15 },
+    { eventId: 2, category: 'Mikrofone', name: 'Shure SM58 Funkmikrofon-Set', qty: 2, needed: true, packed: false, note: 'Batterien prüfen!', source: 'catalog', isExternal: false, priceDay: 25 },
+    { eventId: 2, category: 'DJ', name: 'DJ-Controller / Laptop', qty: 1, needed: true, packed: false, note: 'Rekordbox / Serato', source: 'catalog', isExternal: false, priceDay: 0 },
+    { eventId: 2, category: 'Kabel', name: 'XLR-Kabel (verschiedene Längen)', qty: 12, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 1 },
+    { eventId: 2, category: 'Licht', name: 'Moving Head Spot (Miete)', qty: 4, needed: true, packed: false, note: 'Extern bestellen', source: 'catalog', isExternal: true, priceDay: 35 },
+    { eventId: 2, category: 'Licht', name: 'Lichtständer / Traversen', qty: 4, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 5 }
+  ]);
+
+  // ── Equipment Items (für Event 003 – Konzert Musikverein) ──
+  await db.equipmentItems.bulkAdd([
+    { eventId: 3, category: 'Mischpult', name: 'Allen & Heath SQ6 + Waves', qty: 1, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 115 },
+    { eventId: 3, category: 'Lautsprecher', name: 'LD Systems ICOA 12 Pro A (Top)', qty: 2, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 24 },
+    { eventId: 3, category: 'Lautsprecher', name: 'Lautsprecher-Ständer', qty: 2, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 3.5 },
+    { eventId: 3, category: 'Mikrofone', name: 'Shure SM58 (Kabel)', qty: 2, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 3.5 },
+    { eventId: 3, category: 'DI-Boxen', name: 'Passive DI-Boxen', qty: 4, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 3 },
+    { eventId: 3, category: 'Kabel', name: 'XLR-Kabel (verschiedene Längen)', qty: 10, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 1 },
+    { eventId: 3, category: 'Zubehör', name: 'Gaffa-Tape', qty: 2, needed: true, packed: false, note: '', source: 'catalog', isExternal: false, priceDay: 2 }
   ]);
 
   // ── Payments (für Event 001) ──
