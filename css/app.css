@@ -1296,3 +1296,92 @@ body {
   .cal-day { min-height: 38px; padding: 2px; }
   .cal-dot { width: 6px; height: 6px; }
 }
+
+/* ═══════════════════════════════════════════════
+   LOGIN / AUTH STYLES
+   ═══════════════════════════════════════════════ */
+
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--c-bg);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+}
+.login-overlay.active { display: flex; }
+
+body.login-active .sidebar,
+body.login-active .topbar,
+body.login-active #page-content {
+  filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.login-card {
+  background: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  width: 100%;
+  max-width: 380px;
+  box-shadow: var(--shadow-lg);
+  animation: loginFade 300ms ease;
+}
+@keyframes loginFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+  justify-content: center;
+}
+.login-brand svg {
+  color: var(--c-accent);
+}
+.login-brand-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.login-brand-sub {
+  font-size: 0.75rem;
+  color: var(--c-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.login-form { display: flex; flex-direction: column; gap: var(--space-md); }
+.login-form .form-group:last-of-type { margin-bottom: var(--space-sm); }
+
+.login-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--c-danger);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.login-hint {
+  margin-top: var(--space-lg);
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--c-text-3);
+}
+.login-hint code {
+  background: var(--c-bg-hover);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--c-text-2);
+  font-family: ui-monospace, monospace;
+}
+
+.btn-block { width: 100%; justify-content: center; }

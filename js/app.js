@@ -12,11 +12,21 @@ const app = {
   // INIT
   // ═══════════════════════════════════════════════
   async init() {
+    const loggedIn = await Auth.init();
+    if (!loggedIn) {
+      Auth.showLogin();
+      return;
+    }
+    await this.initWithUser();
+  },
+
+  async initWithUser() {
+    const uname = document.getElementById('topbar-username');
+    if (uname && Auth.currentUser) uname.textContent = Auth.currentUser.username;
     await seedDatabase();
     this.bindNavigation();
     this.bindMobileMenu();
     this.bindGlobalSearch();
-    this.checkLock();          // Lock-Screen prüfen
     this.navigate(location.hash || '#dashboard');
     window.addEventListener('hashchange', () => this.navigate(location.hash));
     lucide.createIcons();
@@ -41,8 +51,8 @@ const app = {
       return;
     }
 
-    // LOCK CHECK (ausser bei Dashboard/Market/Export-Seiten)
-    this.checkLock();
+    // Auth-Check
+    if (!Auth.currentUser) { Auth.showLogin(); return; }
 
     // NORMAL ROUTE
     const seq = ++this._navSeq;
@@ -169,11 +179,22 @@ const app = {
     });
   },
 
+
+  // ═══════════════════════════════════════════════
+  // USER MENU
+  // ═══════════════════════════════════════════════
+  toggleUserMenu() {
+    const dd = document.getElementById('user-dropdown');
+    if (!dd) return;
+    const show = dd.style.display === 'none';
+    dd.style.display = show ? 'block' : 'none';
+  },
+
   // ═══════════════════════════════════════════════
   // DASHBOARD
   // ═══════════════════════════════════════════════
   async renderDashboard() {
-    const events = await db.events.toArray();
+    const events = await db.events.where('userId').equals(Auth.userId || 1).toArray();
     const confirmed = events.filter(e => ['confirmed', 'paid', 'done'].includes(e.status));
     const totalRevenue = confirmed.reduce((s, e) => s + (e.totalPrice || 0), 0);
     const openOffers = events.filter(e => e.status === 'offer').length;
@@ -422,7 +443,7 @@ const app = {
   // EVENTS LIST
   // ═══════════════════════════════════════════════
   async renderEvents(search = '') {
-    let events = await db.events.toArray();
+    let events = await db.events.where('userId').equals(Auth.userId || 1).toArray();
     if (search) {
       events = events.filter(e =>
         (e.clientName || '').toLowerCase().includes(search) ||
@@ -488,7 +509,7 @@ const app = {
   // CREATE / EDIT EVENT
   // ═══════════════════════════════════════════════
   async createEvent() {
-    const count = await db.events.count();
+    const count = await db.events.where('userId').equals(Auth.userId || 1).count();
     const nextNum = `TLS-2026-${String(count + 1).padStart(3, '0')}`;
 
     const fields = [
@@ -539,6 +560,7 @@ const app = {
         data.remaining = (data.totalPrice || 0) - (data.deposit || 0);
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
+        data.userId = Auth.userId || 1;
         const id = await db.events.add(data);
         UI.toast('Auftrag erstellt: ' + data.orderNumber, 'success');
         this.navigate('#events');
@@ -591,6 +613,7 @@ const app = {
         data.remaining = (data.totalPrice || 0) - (data.deposit || 0);
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
+        data.userId = Auth.userId || 1;
         await db.events.update(id, data);
         UI.toast('Auftrag aktualisiert', 'success');
         this.navigate('#events');
@@ -617,7 +640,7 @@ const app = {
   async renderPlanner(eventId) {
     if (!eventId) {
       // Show event selector
-      const events = await db.events.toArray();
+      const events = await db.events.where('userId').equals(Auth.userId || 1).toArray();
       return `
         <div class="page-header">
           <h1 class="page-title">Planung</h1>
@@ -899,7 +922,7 @@ const app = {
   // ═══════════════════════════════════════════════
   async renderContacts(eventId, search = '') {
     if (!eventId) {
-      let events = await db.events.toArray();
+      let events = await db.events.where('userId').equals(Auth.userId || 1).toArray();
       if (search) {
         events = events.filter(e =>
           (e.clientName || '').toLowerCase().includes(search) ||
@@ -1021,7 +1044,7 @@ const app = {
   // ═══════════════════════════════════════════════
   async renderEquipment(eventId, search = '') {
     if (!eventId) {
-      let events = await db.events.toArray();
+      let events = await db.events.where('userId').equals(Auth.userId || 1).toArray();
       if (search) {
         events = events.filter(e =>
           (e.clientName || '').toLowerCase().includes(search) ||
@@ -1070,7 +1093,7 @@ const app = {
     const progress = totalNeeded > 0 ? Math.round((totalPacked / totalNeeded) * 100) : 0;
 
     // Pakete laden
-    const packages = await db.equipmentPackages.toArray();
+    const packages = await db.equipmentPackages.where('userId').equals(Auth.userId || 1).toArray();
 
     const renderCatBlock = (byCat, title, badgeColor) => {
       if (Object.keys(byCat).length === 0) return '';
@@ -1315,7 +1338,7 @@ const app = {
     const pkg = await db.equipmentPackages.where('name').equals(packageName).first();
     if (!pkg) return;
 
-    const catalog = await db.equipmentCatalog.toArray();
+    const catalog = await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray();
     const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
     const existingNames = new Set(existing.map(e => e.name));
 
@@ -1331,7 +1354,7 @@ const app = {
         // Bestands-Check
         let canAdd = true;
         if (!item.isExternal && item.stock < 999) {
-          const allEv = await db.events.toArray();
+          const allEv = await db.events.where('userId').equals(Auth.userId || 1).toArray();
           const evIds = allEv.filter(ev => ev.id !== this.currentEventId).map(ev => ev.id);
           let used = 0;
           for (const eid of evIds) {
@@ -1370,7 +1393,7 @@ const app = {
   // ═══════════════════════════════════════════════
   async renderCalculation(eventId) {
     if (!eventId) {
-      const events = await db.events.toArray();
+      const events = await db.events.where('userId').equals(Auth.userId || 1).toArray();
       return `
         <div class="page-header"><h1 class="page-title">Kalkulation</h1></div>
         <p class="text-muted mb-2">Wähle einen Auftrag:</p>
@@ -1386,7 +1409,7 @@ const app = {
     this.currentEventId = parseInt(eventId);
     const e = await db.events.get(this.currentEventId);
     const items = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
-    const catalog = await db.equipmentCatalog.toArray();
+    const catalog = await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray();
     const payments = await db.payments.where('eventId').equals(this.currentEventId).toArray();
 
     // Calculate equipment costs
@@ -1729,60 +1752,8 @@ const app = {
   // ═══════════════════════════════════════════════
   // LOCK SCREEN (App-Passwort)
   // ═══════════════════════════════════════════════
-  lockScreenHTML() {
-    return `
-    <div class="lock-screen" id="lock-screen">
-      <div class="lock-card">
-        <div class="lock-icon">🔒</div>
-        <div class="lock-title">TLS Event Manager</div>
-        <div class="lock-sub">Gib dein App-Passwort ein.</div>
-        <form id="unlock-form" onsubmit="app.unlock(event)">
-          <input type="password" name="password" placeholder="Passwort" class="form-input" style="text-align:center;margin-bottom:var(--space-md)" autocomplete="off" autofocus>
-          <button type="submit" class="btn btn-primary" style="width:100%">🔓 Entsperren</button>
-        </form>
-      </div>
-    </div>`;
-  },
-
-  async unlock(event) {
-    event.preventDefault();
-    const pw = document.querySelector('#unlock-form input[name=password]').value;
-    const saved = await db.settings.get('appPassword');
-    const current = saved ? saved.value : '';
-
-    if (current === '' || pw === current) {
-      await db.settings.put({ key: 'isLocked', value: false });
-      const ls = document.getElementById('lock-screen');
-      if (ls) ls.remove();
-      UI.toast('Willkommen zurück', 'success');
-    } else {
-      UI.toast('Falsches Passwort', 'danger');
-    }
-  },
-
   async setPassword() {
-    const fields = [
-      { name: 'newPass', label: 'Neues Passwort', type: 'password', placeholder: 'Leer = kein Passwort' },
-      { name: 'confirmPass', label: 'Wiederholen', type: 'password' }
-    ];
-    UI.openModal('App-Passwort setzen', `<form id="pw-form">${UI.form(fields)}</form>`, async () => {
-      const d = UI.getFormData(document.getElementById('pw-form'));
-      if (d.newPass !== d.confirmPass) { UI.toast('Passwörter stimmen nicht überein', 'danger'); return; }
-      await db.settings.put({ key: 'appPassword', value: d.newPass || '' });
-      await db.settings.put({ key: 'isLocked', value: d.newPass ? false : false });
-      UI.toast(d.newPass ? 'Passwort gespeichert' : 'Passwort entfernt', 'success');
-    });
-  },
-
-  async checkLock() {
-    const locked = await db.settings.get('isLocked');
-    const saved = await db.settings.get('appPassword');
-    const needsLock = saved && saved.value && (locked ? locked.value : true);
-    if (!needsLock) return;
-
-    const existing = document.getElementById('lock-screen');
-    if (existing) return;
-    document.body.insertAdjacentHTML('beforeend', this.lockScreenHTML());
+    Auth.showPasswordChange();
   },
 
   // ═══════════════════════════════════════════════
@@ -1790,14 +1761,15 @@ const app = {
   // ═══════════════════════════════════════════════
   async exportData() {
     const data = {
-      events: await db.events.toArray(),
-      locations: await db.locations.toArray(),
-      contacts: await db.contacts.toArray(),
-      timeline: await db.timeline.toArray(),
-      equipmentItems: await db.equipmentItems.toArray(),
-      equipmentCatalog: await db.equipmentCatalog.toArray(),
-      payments: await db.payments.toArray(),
-      eventTodos: await db.eventTodos.toArray(),
+      events: await db.events.where('userId').equals(Auth.userId || 1).toArray(),
+      userEventIds: (await db.events.where('userId').equals(Auth.userId || 1).toArray()).map(e => e.id),
+      locations: (await db.locations.toArray()).filter(l => userEventIds.includes(l.eventId)),
+      contacts: (await db.contacts.toArray()).filter(c => userEventIds.includes(c.eventId)),
+      timeline: (await db.timeline.toArray()).filter(t => userEventIds.includes(t.eventId)),
+      equipmentItems: (await db.equipmentItems.toArray()).filter(it => userEventIds.includes(it.eventId)),
+      equipmentCatalog: await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray(),
+      payments: (await db.payments.toArray()).filter(p => userEventIds.includes(p.eventId)),
+      eventTodos: (await db.eventTodos.toArray()).filter(t => userEventIds.includes(t.eventId)),
       exportedAt: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1811,6 +1783,7 @@ const app = {
   },
 
   async importData() {
+    const uid = Auth.userId || 1;
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -1820,22 +1793,33 @@ const app = {
       const text = await file.text();
       try {
         const data = JSON.parse(text);
-        await db.events.clear();
-        await db.locations.clear();
-        await db.contacts.clear();
-        await db.timeline.clear();
-        await db.equipmentItems.clear();
-        await db.equipmentCatalog.clear();
-        await db.payments.clear();
-        await db.eventTodos.clear();
-        if (data.events)        await db.events.bulkPut(data.events);
-        if (data.locations)     await db.locations.bulkPut(data.locations);
-        if (data.contacts)      await db.contacts.bulkPut(data.contacts);
-        if (data.timeline)      await db.timeline.bulkPut(data.timeline);
-        if (data.equipmentItems)await db.equipmentItems.bulkPut(data.equipmentItems);
-        if (data.equipmentCatalog)await db.equipmentCatalog.bulkPut(data.equipmentCatalog);
-        if (data.payments)      await db.payments.bulkPut(data.payments);
-        if (data.eventTodos)    await db.eventTodos.bulkPut(data.eventTodos);
+        // Delete only current user's data
+        const userEvents = await db.events.where('userId').equals(uid).toArray();
+        const userEventIds = userEvents.map(ev => ev.id);
+        for (const eid of userEventIds) {
+          await db.locations.where('eventId').equals(eid).delete();
+          await db.contacts.where('eventId').equals(eid).delete();
+          await db.timeline.where('eventId').equals(eid).delete();
+          await db.equipmentItems.where('eventId').equals(eid).delete();
+          await db.payments.where('eventId').equals(eid).delete();
+          await db.eventTodos.where('eventId').equals(eid).delete();
+        }
+        await db.events.where('userId').equals(uid).delete();
+        await db.equipmentCatalog.where('userId').equals(uid).delete();
+        await db.equipmentPackages.where('userId').equals(uid).delete();
+        // Import with userId stamped
+        if (data.events) {
+          for (const ev of data.events) ev.userId = uid;
+          await db.events.bulkPut(data.events);
+        }
+        if (data.locations) { for (const l of data.locations) l.userId = uid; await db.locations.bulkPut(data.locations); }
+        if (data.contacts) { for (const c of data.contacts) c.userId = uid; await db.contacts.bulkPut(data.contacts); }
+        if (data.timeline) { for (const t of data.timeline) t.userId = uid; await db.timeline.bulkPut(data.timeline); }
+        if (data.equipmentItems) { for (const it of data.equipmentItems) it.userId = uid; await db.equipmentItems.bulkPut(data.equipmentItems); }
+        if (data.equipmentCatalog) { for (const c of data.equipmentCatalog) c.userId = uid; await db.equipmentCatalog.bulkPut(data.equipmentCatalog); }
+        if (data.equipmentPackages) { for (const p of data.equipmentPackages) p.userId = uid; await db.equipmentPackages.bulkPut(data.equipmentPackages); }
+        if (data.payments) { for (const p of data.payments) p.userId = uid; await db.payments.bulkPut(data.payments); }
+        if (data.eventTodos) { for (const t of data.eventTodos) t.userId = uid; await db.eventTodos.bulkPut(data.eventTodos); }
         UI.toast('Daten importiert', 'success');
         this.navigate('#dashboard');
       } catch (err) {
@@ -1849,9 +1833,11 @@ const app = {
   // SETTINGS PAGE
   // ═══════════════════════════════════════════════
   async renderSettings() {
-    const eventCount = await db.events.count();
-    const itemCount = await db.equipmentItems.count();
-    const catalogCount = await db.equipmentCatalog.count();
+    const eventCount = await db.events.where('userId').equals(Auth.userId || 1).count();
+    const userEventIds = (await db.events.where('userId').equals(Auth.userId || 1).toArray()).map(e => e.id);
+    let itemCount = 0;
+    for (const eid of userEventIds) { itemCount += await db.equipmentItems.where('eventId').equals(eid).count(); }
+    const catalogCount = await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).count();
 
     return `
       <div class="page-header"><h1 class="page-title">Einstellungen</h1></div>
@@ -1924,8 +1910,8 @@ const app = {
   },
 
   async renderCatalog() {
-    const catalog = await db.equipmentCatalog.toArray();
-    const packages = await db.equipmentPackages.toArray();
+    const catalog = await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray();
+    const packages = await db.equipmentPackages.where('userId').equals(Auth.userId || 1).toArray();
 
     const ownCount = catalog.filter(c => !c.isExternal).length;
     const extCount = catalog.filter(c => c.isExternal).length;
@@ -2022,6 +2008,7 @@ const app = {
       d.stock = parseInt(d.stock) || 1;
       d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
       d.isExternal = !!d.isExternal;
+      d.userId = Auth.userId || 1;
       await db.equipmentCatalog.add(d);
       UI.toast('Gerät hinzugefügt', 'success');
       this.openCatalogEditor();
@@ -2045,6 +2032,7 @@ const app = {
       d.stock = parseInt(d.stock) || 1;
       d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
       d.isExternal = !!d.isExternal;
+      d.userId = Auth.userId || 1;
       await db.equipmentCatalog.update(id, d);
       UI.toast('Gerät aktualisiert', 'success');
       this.openCatalogEditor();
@@ -2060,6 +2048,7 @@ const app = {
     UI.openModal('Neues Paket erstellen', `<form id="pkg-form">${UI.form(fields)}</form>`, async () => {
       const d = UI.getFormData(document.getElementById('pkg-form'));
       d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      d.userId = Auth.userId || 1;
       await db.equipmentPackages.add(d);
       UI.toast('Paket erstellt', 'success');
       this.openCatalogEditor();
@@ -2080,7 +2069,7 @@ const app = {
   // KATALOG-PICKER (mit Mengenauswahl)
   // ═══════════════════════════════════════════════
   async openCatalogPicker() {
-    const catalog = await db.equipmentCatalog.toArray();
+    const catalog = await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray();
     const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
     const existingMap = new Map(existing.map(e => [e.name, e]));
 
@@ -2279,7 +2268,7 @@ const app = {
 
   async changeEventStatus(id, status) {
     const statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt', confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' };
-    await db.events.update(id, { status, statusLabel: statusLabel[status] });
+    await db.events.update(id, { status, statusLabel: statusLabel[status], userId: Auth.userId || 1 });
     UI.toast(`Status: ${statusLabel[status]}`, 'success');
     this.navigate(`#planner/${id}`);
   },
@@ -2447,7 +2436,7 @@ const app = {
     const firstDay = startOfMonth.getDay(); // 0=Su, 1=Mo...
 
     // Alle Events laden
-    const allEvents = await db.events.toArray();
+    const allEvents = await db.events.where('userId').equals(Auth.userId || 1).toArray();
 
     // Hilfsfunktion: ISO-String YYYY-MM-DD erstellen OHNE UTC-Shift
     const toLocalISO = (y, m, d) => {
@@ -2549,11 +2538,12 @@ const app = {
     UI.openModal('Neuer Auftrag am ' + UI.formatDate(dateStr), `<form id="quick-event-form">${UI.form(fields)}</form>`, async () => {
       const data = UI.getFormData(document.getElementById('quick-event-form'));
       // Generate order number
-      const count = await db.events.count();
+      const count = await db.events.where('userId').equals(Auth.userId || 1).count();
       const now = new Date();
       data.orderNumber = 'TLS-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(count + 1).padStart(3,'0');
       data.status = 'inquiry';
       data.date = dateStr;
+      data.userId = Auth.userId || 1;
       const id = await db.events.add(data);
       UI.toast('Auftrag erstellt', 'success');
       this.navigate('#planner/' + id);
@@ -2562,7 +2552,7 @@ const app = {
 
   async showDayEvents(year, month, day) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const events = (await db.events.toArray()).filter(ev => ev.date === dateStr);
+    const events = (await db.events.where('userId').equals(Auth.userId || 1).toArray()).filter(ev => ev.date === dateStr);
     if (!events.length) return;
     UI.toast(`${events.length} Event${events.length > 1 ? 's' : ''} am ${UI.formatDate(dateStr)}`, 'info');
     // Anzeige im Modal
@@ -2648,7 +2638,7 @@ const app = {
   async checkStockConflict(catalogItem, requestedQty, excludeEventId = null) {
     if (catalogItem.isExternal || catalogItem.stock >= 999) return { conflict: false };
     let used = 0;
-    const allEvents = await db.events.toArray();
+    const allEvents = await db.events.where('userId').equals(Auth.userId || 1).toArray();
     for (const ev of allEvents) {
       if (excludeEventId && ev.id === excludeEventId) continue;
       const items = await db.equipmentItems.where({ eventId: ev.id, name: catalogItem.name }).toArray();

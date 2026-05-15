@@ -112,6 +112,22 @@
         <input type="text" placeholder="Aufträge, Kontakte, Equipment suchen..." id="global-search">
       </div>
       <div class="topbar-actions">
+        <div class="topbar-user" style="position:relative">
+          <button class="btn btn-ghost btn-sm" id="user-menu-btn" onclick="app.toggleUserMenu()"
+            style="display:flex;align-items:center;gap:6px;color:var(--c-text-2)">
+            <i data-lucide="user" style="width:16px;height:16px"></i>
+            <span id="topbar-username">Timon</span>
+            <i data-lucide="chevron-down" style="width:14px;height:14px"></i>
+          </button>
+          <div id="user-dropdown" class="user-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--c-bg-card);border:1px solid var(--c-border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);min-width:180px;z-index:100;overflow:hidden">
+            <button class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:10px 14px;font-size:0.875rem" onclick="app.toggleUserMenu();Auth.showPasswordChange()">
+              <i data-lucide="key" style="width:16px;height:16px"></i> Passwort ändern
+            </button>
+            <button class="btn btn-ghost" style="width:100%;justify-content:flex-start;border-radius:0;padding:10px 14px;font-size:0.875rem;color:var(--c-danger)" onclick="app.toggleUserMenu();Auth.logout()">
+              <i data-lucide="log-out" style="width:16px;height:16px"></i> Abmelden
+            </button>
+          </div>
+        </div>
         <button class="btn btn-secondary btn-sm" onclick="app.exportPDF()" title="Als PDF drucken">
           <i data-lucide="printer"></i>
         </button>
@@ -135,6 +151,7 @@
 
   <script src="js/db.js"></script>
   <script src="js/components.js"></script>
+  <script src="js/auth.js"></script>
   <script>
     // ═══ PWA STANDALONE DETECTION ═══
     if (navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches) {
