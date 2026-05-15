@@ -1,11 +1,10 @@
 /**
  * TLS Event Manager — Auth & User Management
- * Login, Session, Passwort-Ändern, User-Isolation
+ * Kein persistentes Session-Remembering. Passwort wird bei jedem Öffnen gefordert.
  */
 
 const Auth = {
   currentUser: null,
-  SESSION_KEY: 'tls_session',
   DEFAULT_USER: { id: 1, username: 'Timon', password: 'TLS-Event-2026!' },
 
   // ═══════════════════════════════════════════════
@@ -17,36 +16,14 @@ const Auth = {
     if (!user) {
       await db.users.put({ ...this.DEFAULT_USER });
     }
-    // Check for existing session
-    const session = this.getSession();
-    if (session?.userId) {
-      const u = await db.users.get(session.userId);
-      if (u) {
-        this.currentUser = u;
-        return true;
-      }
-    }
+    // KEIN Auto-Login. Jeder Öffnen = Passwort fragen.
     return false;
-  },
-
-  getSession() {
-    try { return JSON.parse(localStorage.getItem(this.SESSION_KEY)); } catch { return null; }
-  },
-
-  setSession(userId) {
-    localStorage.setItem(this.SESSION_KEY, JSON.stringify({ userId, ts: Date.now() }));
-  },
-
-  clearSession() {
-    localStorage.removeItem(this.SESSION_KEY);
-    this.currentUser = null;
   },
 
   // ═══════════════════════════════════════════════
   // LOGIN OVERLAY
   // ═══════════════════════════════════════════════
   showLogin() {
-    // Blur main app
     document.body.classList.add('login-active');
 
     let overlay = document.getElementById('login-overlay');
@@ -93,10 +70,8 @@ const Auth = {
     overlay.classList.add('active');
     lucide.createIcons({ nodes: [overlay] });
 
-    // Focus password field
     setTimeout(() => document.getElementById('login-password')?.focus(), 100);
 
-    // Bind form
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       await this.attemptLogin();
@@ -128,10 +103,8 @@ const Auth = {
     }
 
     this.currentUser = user;
-    this.setSession(user.id);
     this.hideLogin();
 
-    // Re-init app with user context
     await app.initWithUser();
     UI.toast('Willkommen, ' + user.username + '!', 'success');
   },
@@ -140,9 +113,9 @@ const Auth = {
   // LOGOUT
   // ═══════════════════════════════════════════════
   logout() {
-    this.clearSession();
-    this.showLogin();
-    UI.toast('Abgemeldet', 'info');
+    this.currentUser = null;
+    // Reload = komplett sauberer Zustand, Passwort wird sofort wieder gefordert
+    location.reload();
   },
 
   // ═══════════════════════════════════════════════
