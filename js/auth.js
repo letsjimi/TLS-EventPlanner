@@ -10,12 +10,22 @@ const Auth = {
   // INIT
   // ═══════════════════════════════════════════════
   async init() {
-    // Stelle sicher, dass mindestens ein Admin-User existiert
+    const tok = localStorage.getItem('jwt');
+    if (tok) {
+      API.token = tok;
+      try {
+        const me = await API.auth.me();
+        this.currentUser = { id: me.id, username: me.username, displayName: me.displayName, role: me.isAdmin ? 'admin' : 'user' };
+        return true;
+      } catch(e) {
+        API.token = null; localStorage.removeItem('jwt');
+      }
+    }
+    // Fallback: lokal seeden
     const userCount = await db.users.count();
     if (userCount === 0) {
       await db.users.add({ username: 'Timon', password: 'TLS-Event-2026!', role: 'admin' });
     }
-    // KEIN Auto-Login. Jeder Öffnen = Benutzername + Passwort fragen.
     return false;
   },
 
@@ -96,6 +106,21 @@ const Auth = {
       errorEl.style.display = 'block';
       btn.disabled = false;
       return;
+    }
+
+    // Zuerst API-Login versuchen
+    try {
+      const res = await API.auth.login(username, password);
+      API.token = res.token;
+      localStorage.setItem('jwt', res.token);
+      this.currentUser = { id: res.user.id, username: res.user.username, displayName: res.user.displayName, role: res.user.isAdmin ? 'admin' : 'user' };
+      this.hideLogin();
+      await app.initWithUser();
+      UI.toast('Willkommen, ' + this.currentUser.displayName + '!', 'success');
+      return;
+    } catch (apiErr) {
+      // API nicht erreichbar: Fallback auf lokale DB
+      console.warn('API Login fehlgeschlagen, Fallback auf local:', apiErr.message);
     }
 
     const user = await db.users.where('username').equals(username).first();
