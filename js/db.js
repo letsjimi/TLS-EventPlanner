@@ -63,13 +63,14 @@ db.version(1).stores({
 
 async function seedDatabase() {
   const uid = Auth.userId || 1;
+  if (uid !== 1) return; // Seed-Daten nur für den ersten Account (Timon)
+
   const count = await db.events.where('userId').equals(uid).count();
   if (count > 0) {
     // Prüfe ob alte Seed-Daten (Juni/August) vorhanden sind
     const oldSeed = await db.events.where('userId').equals(uid).and(e => e.date >= '2026-06-01' && e.date <= '2026-08-31').toArray();
     if (oldSeed.length === 0) return; // Benutzer hat eigene Daten → nicht überschreiben
     // Alte Seed-Daten gefunden → alle Seed-relevanten Tabellen löschen und neu seeden
-    // Get event IDs for this user to delete related data
     const userEvents = await db.events.where('userId').equals(uid).toArray();
     const userEventIds = userEvents.map(e => e.id);
     for (const eid of userEventIds) {
@@ -84,57 +85,31 @@ async function seedDatabase() {
     await db.equipmentPackages.where('userId').equals(uid).delete();
   }
 
-  // ── Events ──
-  await db.events.bulkAdd([
-    {
-      orderNumber: 'TLS-2026-001',
-      date: '2026-05-10',
-      eventType: 'Hochzeit',
-      clientName: 'Schneider & Müller',
-      locations: 'Kirche St. Peter → Festhalle Rüsselsheim',
-      totalPrice: 2850.00,
-      deposit: 850.00,
-      remaining: 2000.00,
-      status: 'confirmed',
-      statusLabel: 'Bestätigt',
-      notes: 'Location-Wechsel! 2x Setup nötig. Braut wünscht sanfte Beleuchtung während Dinner.',
-      duration: 1,
-      km: 90,
-      createdAt: new Date().toISOString()
-    },
-    {
-      orderNumber: 'TLS-2026-002',
-      date: '2026-05-20',
-      eventType: 'Firmenfeier',
-      clientName: 'ABC GmbH Frankfurt',
-      locations: 'Kongresszentrum Frankfurt',
-      totalPrice: 1850.00,
-      deposit: 500.00,
-      remaining: 1350.00,
-      status: 'offer',
-      statusLabel: 'Angebot',
-      notes: 'Catering-Abstimmung offen. Firmenlogo auf LED-Wall gewünscht.',
-      duration: 1,
-      km: 25,
-      createdAt: new Date().toISOString()
-    },
-    {
-      orderNumber: 'TLS-2026-003',
-      date: '2026-06-05',
-      eventType: 'Konzert',
-      clientName: 'Musikverein Darmstadt',
-      locations: 'Jazzclub Darmstadt',
-      totalPrice: 1200.00,
-      deposit: 0,
-      remaining: 1200.00,
-      status: 'inquiry',
-      statusLabel: 'Anfrage',
-      notes: 'Line-In für Band vorhanden. 4-Kanal Mischpult ausreichend.',
-      duration: 1,
-      km: 35,
-      createdAt: new Date().toISOString()
-    }
-  ]);
+  // ── Events (userId = 1) ──
+  const ev1 = await db.events.add({
+    userId: 1, orderNumber: 'TLS-2026-001', date: '2026-05-10', eventType: 'Hochzeit',
+    clientName: 'Schneider & Müller', locations: 'Kirche St. Peter → Festhalle Rüsselsheim',
+    totalPrice: 2850.00, deposit: 850.00, remaining: 2000.00, status: 'confirmed',
+    statusLabel: 'Bestätigt',
+    notes: 'Location-Wechsel! 2x Setup nötig. Braut wünscht sanfte Beleuchtung während Dinner.',
+    duration: 1, km: 90, createdAt: new Date().toISOString()
+  });
+  const ev2 = await db.events.add({
+    userId: 1, orderNumber: 'TLS-2026-002', date: '2026-05-20', eventType: 'Firmenfeier',
+    clientName: 'ABC GmbH Frankfurt', locations: 'Kongresszentrum Frankfurt',
+    totalPrice: 1850.00, deposit: 500.00, remaining: 1350.00, status: 'offer',
+    statusLabel: 'Angebot',
+    notes: 'Catering-Abstimmung offen. Firmenlogo auf LED-Wall gewünscht.',
+    duration: 1, km: 25, createdAt: new Date().toISOString()
+  });
+  const ev3 = await db.events.add({
+    userId: 1, orderNumber: 'TLS-2026-003', date: '2026-06-05', eventType: 'Konzert',
+    clientName: 'Musikverein Darmstadt', locations: 'Jazzclub Darmstadt',
+    totalPrice: 1200.00, deposit: 0, remaining: 1200.00, status: 'inquiry',
+    statusLabel: 'Anfrage',
+    notes: 'Line-In für Band vorhanden. 4-Kanal Mischpult ausreichend.',
+    duration: 1, km: 35, createdAt: new Date().toISOString()
+  });
 
   // ── Locations (für Event 001) ──
   await db.locations.bulkAdd([

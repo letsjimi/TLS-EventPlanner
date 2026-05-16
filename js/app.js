@@ -1757,6 +1757,63 @@ const app = {
   },
 
   // ═══════════════════════════════════════════════
+  // ADMIN: CREATE USER
+  // ═══════════════════════════════════════════════
+  showCreateUser() {
+    if (!Auth.isAdmin()) {
+      UI.toast('Nur Admins können Benutzer erstellen.', 'error');
+      return;
+    }
+    UI.openModal('Neuen Benutzer erstellen', `
+      <form id="create-user-form">
+        <div class="form-group">
+          <label class="form-label">Benutzername</label>
+          <input type="text" class="form-input" id="new-username" required placeholder="z.B. Max">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Passwort</label>
+          <input type="password" class="form-input" id="new-password" required minlength="6" placeholder="Mindestens 6 Zeichen">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Passwort wiederholen</label>
+          <input type="password" class="form-input" id="new-password-confirm" required placeholder="Passwort wiederholen">
+        </div>
+        <div id="create-user-error" style="color:var(--c-danger);font-size:0.85rem;display:none;margin-top:var(--space-sm)"></div>
+      </form>
+    `, async () => {
+      const username = document.getElementById('new-username').value.trim();
+      const password = document.getElementById('new-password').value;
+      const confirm = document.getElementById('new-password-confirm').value;
+      const errEl = document.getElementById('create-user-error');
+
+      if (!username || !password) {
+        errEl.textContent = 'Benutzername und Passwort sind erforderlich.';
+        errEl.style.display = 'block';
+        throw new Error('empty');
+      }
+      if (password !== confirm) {
+        errEl.textContent = 'Passwörter stimmen nicht überein.';
+        errEl.style.display = 'block';
+        throw new Error('mismatch');
+      }
+      if (password.length < 6) {
+        errEl.textContent = 'Passwort muss mindestens 6 Zeichen haben.';
+        errEl.style.display = 'block';
+        throw new Error('too_short');
+      }
+
+      try {
+        const id = await Auth.createUser(username, password);
+        UI.toast('Benutzer "' + username + '" erstellt (ID: ' + id + ')', 'success');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+        throw err;
+      }
+    }, 'Benutzer erstellen');
+  },
+
+  // ═══════════════════════════════════════════════
   // EXPORT / IMPORT
   // ═══════════════════════════════════════════════
   async exportData() {
@@ -1873,6 +1930,18 @@ const app = {
             <i data-lucide="lock" style="width:16px;height:16px"></i> Passwort ändern
           </button>
         </div>
+
+        <!-- Admin: User erstellen -->
+        ${Auth.isAdmin() ? `
+        <div class="card">
+          <div class="card-header"><div class="card-title">👤 Benutzerverwaltung</div></div>
+          <p style="color:var(--c-text-2);font-size:0.875rem;margin-bottom:var(--space-md)">
+            Erstelle neue Benutzer-Accounts. Jeder Benutzer sieht nur seine eigenen Daten.
+          </p>
+          <button class="btn btn-secondary" onclick="app.showCreateUser()">
+            <i data-lucide="user-plus" style="width:16px;height:16px"></i> Neuen Benutzer erstellen
+          </button>
+        </div>` : ''}
 
         <!-- Katalog-Verwaltung -->
         <div class="card">

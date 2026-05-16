@@ -1,22 +1,21 @@
 /**
  * TLS Event Manager — Auth & User Management
- * Kein persistentes Session-Remembering. Passwort wird bei jedem Öffnen gefordert.
+ * Multi-User: Kein Auto-Login, Username+Passwort, Admin kann User erstellen.
  */
 
 const Auth = {
   currentUser: null,
-  DEFAULT_USER: { id: 1, username: 'Timon', password: 'TLS-Event-2026!' },
 
   // ═══════════════════════════════════════════════
   // INIT
   // ═══════════════════════════════════════════════
   async init() {
-    // Ensure default user exists in DB
-    const user = await db.users.get(this.DEFAULT_USER.id);
-    if (!user) {
-      await db.users.put({ ...this.DEFAULT_USER });
+    // Stelle sicher, dass mindestens ein Admin-User existiert
+    const userCount = await db.users.count();
+    if (userCount === 0) {
+      await db.users.add({ username: 'Timon', password: 'TLS-Event-2026!', role: 'admin' });
     }
-    // KEIN Auto-Login. Jeder Öffnen = Passwort fragen.
+    // KEIN Auto-Login. Jeder Öffnen = Benutzername + Passwort fragen.
     return false;
   },
 
@@ -50,11 +49,11 @@ const Auth = {
         <form id="login-form" class="login-form">
           <div class="form-group">
             <label class="form-label">Benutzername</label>
-            <input type="text" class="form-input" id="login-username" value="Timon" readonly style="background:var(--c-surface-2);color:var(--c-text-3)">
+            <input type="text" class="form-input" id="login-username" placeholder="Benutzername eingeben" autofocus>
           </div>
           <div class="form-group">
             <label class="form-label">Passwort</label>
-            <input type="password" class="form-input" id="login-password" placeholder="Passwort eingeben" autofocus>
+            <input type="password" class="form-input" id="login-password" placeholder="Passwort eingeben">
           </div>
           <button type="submit" class="btn btn-primary btn-block" style="margin-top:var(--space-md)">
             <i data-lucide="log-in" style="width:18px;height:18px"></i> Anmelden
@@ -67,7 +66,7 @@ const Auth = {
     overlay.classList.add('active');
     lucide.createIcons({ nodes: [overlay] });
 
-    setTimeout(() => document.getElementById('login-password')?.focus(), 100);
+    setTimeout(() => document.getElementById('login-username')?.focus(), 100);
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -84,6 +83,7 @@ const Auth = {
   // LOGIN LOGIC
   // ═══════════════════════════════════════════════
   async attemptLogin() {
+    const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
     const errorEl = document.getElementById('login-error');
     const btn = document.querySelector('#login-form button[type="submit"]');
@@ -91,9 +91,16 @@ const Auth = {
     btn.disabled = true;
     errorEl.style.display = 'none';
 
-    const user = await db.users.get(this.DEFAULT_USER.id);
+    if (!username) {
+      errorEl.textContent = 'Bitte Benutzername eingeben.';
+      errorEl.style.display = 'block';
+      btn.disabled = false;
+      return;
+    }
+
+    const user = await db.users.where('username').equals(username).first();
     if (!user || user.password !== password) {
-      errorEl.textContent = 'Falsches Passwort. Bitte erneut versuchen.';
+      errorEl.textContent = 'Falscher Benutzername oder Passwort.';
       errorEl.style.display = 'block';
       btn.disabled = false;
       return;
@@ -111,7 +118,6 @@ const Auth = {
   // ═══════════════════════════════════════════════
   logout() {
     this.currentUser = null;
-    // Reload = komplett sauberer Zustand, Passwort wird sofort wieder gefordert
     location.reload();
   },
 
@@ -161,6 +167,28 @@ const Auth = {
       this.currentUser.password = newPw;
       UI.toast('Passwort erfolgreich geändert!', 'success');
     }, 'Passwort ändern');
+  },
+
+  // ═══════════════════════════════════════════════
+  // ADMIN: CREATE USER
+  // ═══════════════════════════════════════════════
+  isAdmin() {
+    return this.currentUser?.id === 1 || this.currentUser?.role === 'admin';
+  },
+
+  async createUser(username, password) {
+    if (!this.isAdmin()) {
+      throw new Error('Nur Admins können neue Benutzer erstellen.');
+    }
+    if (!username || !password || password.length < 6) {
+      throw new Error('Ungültige Eingabe: Benutzername erforderlich, Passwort mindestens 6 Zeichen.');
+    }
+    const existing = await db.users.where('username').equals(username).first();
+    if (existing) {
+      throw new Error('Ein Benutzer mit diesem Namen existiert bereits.');
+    }
+    const id = await db.users.add({ username, password, role: 'user' });
+    return id;
   },
 
   // ═══════════════════════════════════════════════
