@@ -251,23 +251,6 @@ async function seedDatabase() {
       notes: 'Line-In vorhanden | 4-Kanal reicht', availability: 'Jederzeit' }
   ]);
 
-  // ── Contacts (für Event 002) ──
-  await db.contacts.bulkAdd([
-    { eventId: 2, role: 'Kunde / Auftraggeber', name: 'ABC GmbH - Herr Becker', phone: '069/2345678',
-      email: 'events@abc-gmbh.de', responsibility: 'Vertrag, Rechnung, Zahlung',
-      notes: 'Firmen-CI beachten | Logo auf LED-Wall gewünscht', availability: 'Mo-Fr 9-18h' },
-    { eventId: 2, role: 'Location-Kontakt', name: 'Frau Weber', phone: '069/1234567',
-      email: 'events@kongresszentrum.de', responsibility: 'Technische Anschlüsse, Parkplätze',
-      notes: 'Parkplatz B3 reserviert | Cateringbereich EG', availability: 'Bürozeiten' }
-  ]);
-
-  // ── Contacts (für Event 003) ──
-  await db.contacts.bulkAdd([
-    { eventId: 3, role: 'Kunde / Veranstalter', name: 'Musikverein Darmstadt - Frau Lenz', phone: '06151/765432',
-      email: 'info@musikverein-darmstadt.de', responsibility: 'Vertrag, Presse, Zahlung',
-      notes: 'Line-In vorhanden | 4-Kanal reicht', availability: 'Jederzeit' }
-  ]);
-
   // ── Equipment Catalog (TLS Lager) ──
   await db.equipmentCatalog.bulkAdd([
     { userId: 1, category: 'Mischpult', name: 'Allen & Heath SQ6 + Waves', unit: 'Stk', priceDay: 115, stock: 1, tags: ['PA','Mischpult','Band','Hochzeit'], isExternal: false },

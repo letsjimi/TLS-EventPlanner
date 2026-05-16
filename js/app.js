@@ -1895,6 +1895,21 @@ const app = {
   // EXPORT / IMPORT
   // ═══════════════════════════════════════════════
   async exportData() {
+    if (API.token) {
+      try {
+        const data = await API.export.full();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `TLS-Backup-${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        UI.toast('Server-Backup exportiert', 'success');
+        return;
+      } catch (e) { console.warn('API export failed, falling back to local:', e.message); }
+    }
+    // Fallback local export (existing code)
     const userEventIds = (await db.events.where('userId').equals(Auth.userId || 1).toArray()).map(e => e.id);
     const data = {
       events: await db.events.where('userId').equals(Auth.userId || 1).toArray(),
@@ -2705,7 +2720,11 @@ const app = {
 
   async changeEventStatus(id, status) {
     const statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt', confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' };
-    await db.events.update(id, { status, statusLabel: statusLabel[status], userId: Auth.userId || 1 });
+    const data = { status, statusLabel: statusLabel[status] };
+    if (API.token) {
+      try { await API.events.update(id, data); } catch(e) { console.warn('API status update failed:', e.message); }
+    }
+    await db.events.update(id, data);
     UI.toast(`Status: ${statusLabel[status]}`, 'success');
     this.navigate(`#planner/${id}`);
   },
@@ -2981,6 +3000,12 @@ const app = {
       data.status = 'inquiry';
       data.date = dateStr;
       data.userId = Auth.userId || 1;
+      data.orderType = 'event';
+      data.remaining = (data.totalPrice || 0) - (data.deposit || 0);
+      data.deposit = data.deposit || 0;
+      data.duration = 1;
+      data.km = 0;
+      data.synced = API.token ? 0 : 1;
       const id = await db.events.add(data);
       UI.toast('Auftrag erstellt', 'success');
       this.navigate('#planner/' + id);

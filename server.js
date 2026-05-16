@@ -303,7 +303,16 @@ app.put('/api/events/:id', authMW, async (req, res) => {
 });
 
 app.delete('/api/events/:id', authMW, async (req, res) => {
-  await dbRun(`DELETE FROM events WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id]);
+  const id = req.params.id;
+  const uid = req.user.id;
+  await dbRun(`DELETE FROM locations WHERE event_id = ?`, [id]);
+  await dbRun(`DELETE FROM contacts WHERE event_id = ?`, [id]);
+  await dbRun(`DELETE FROM timeline WHERE event_id = ?`, [id]);
+  await dbRun(`DELETE FROM equipment_items WHERE event_id = ?`, [id]);
+  await dbRun(`DELETE FROM payments WHERE event_id = ?`, [id]);
+  await dbRun(`DELETE FROM event_todos WHERE event_id = ?`, [id]);
+  await dbRun(`DELETE FROM event_personnel WHERE event_id = ?`, [id]);
+  await dbRun(`DELETE FROM events WHERE id = ? AND user_id = ?`, [id, uid]);
   res.json({ success: true });
 });
 
@@ -370,8 +379,8 @@ app.post('/api/equipment-packages', authMW, async (req, res) => {
 
 app.put('/api/equipment-packages/:id', authMW, async (req, res) => {
   const d = req.body;
-  await dbRun(`UPDATE equipment_packages SET name=?, tags=?, items=? WHERE id = ? AND user_id = ?`,
-    [d.name, d.tags, JSON.stringify(d.items || []), req.params.id, req.user.id]);
+  await dbRun(`UPDATE equipment_packages SET name=?, description=?, tags=?, items=? WHERE id = ? AND user_id = ?`,
+    [d.name, d.description || '', d.tags, JSON.stringify(d.items || []), req.params.id, req.user.id]);
   res.json({ success: true });
 });
 
@@ -498,15 +507,17 @@ app.post('/api/import/full', authMW, async (req, res) => {
       for (const t of data.eventTodos) {
         await dbRun(
           `INSERT INTO event_todos (event_id, title, due_date, done) VALUES (?, ?, ?, ?)`,
-          [mapEventId(t.eventId), t.title, t.dueDate, t.done ? 1 : 0]
+          [mapEventId(t.event_id), t.title, t.due_date, t.done ? 1 : 0]
         );
       }
     }
     if (data.eventPersonnel) {
       for (const p of data.eventPersonnel) {
+        const eid = mapEventId(p.event_id !== undefined ? p.event_id : p.eventId);
+        if (!eid) continue;
         await dbRun(
           `INSERT INTO event_personnel (event_id, role, qty, unit, price, needed, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [mapEventId(p.eventId), p.role, p.qty || 1, p.unit || 'Pauschale', p.price || 0, p.needed !== false ? 1 : 0, p.sortOrder || 0]
+          [eid, p.role, p.qty || 1, p.unit || 'Pauschale', p.price || 0, p.needed !== false ? 1 : 0, p.sort_order !== undefined ? p.sort_order : (p.sortOrder || 0)]
         );
       }
     }
