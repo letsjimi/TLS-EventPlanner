@@ -1961,15 +1961,33 @@ const app = {
           await db.equipmentItems.where('eventId').equals(eid).delete();
           await db.payments.where('eventId').equals(eid).delete();
           await db.eventTodos.where('eventId').equals(eid).delete();
+          await db.eventPersonnel.where('eventId').equals(eid).delete();
         }
         await db.events.where('userId').equals(uid).delete();
         await db.equipmentCatalog.where('userId').equals(uid).delete();
         await db.equipmentPackages.where('userId').equals(uid).delete();
-        // Import with userId stamped
-        if (data.events) {
-          for (const ev of data.events) ev.userId = uid;
-          await db.events.bulkPut(data.events);
+        // Normalize snake_case → camelCase (handles server exports as well as local exports)
+        const normalizeKeys = (obj) => {
+          if (Array.isArray(obj)) return obj.map(normalizeKeys);
+          if (typeof obj !== 'object' || obj === null) return obj;
+          const out = {};
+          for (const [k, v] of Object.entries(obj)) {
+            const camel = k.replace(/_([a-z])/g, (_, g1) => g1.toUpperCase());
+            out[camel] = Array.isArray(v) ? v.map(normalizeKeys) : v;
+          }
+          return out;
+        };
+        ['events','locations','contacts','timeline','equipmentItems','equipmentCatalog','equipmentPackages','payments','eventTodos','eventPersonnel','settings'].forEach(t => {
+          if (data[t]) data[t] = normalizeKeys(data[t]);
+        });
+        if (data.equipmentItems) {
+          for (const it of data.equipmentItems) {
+            if (it.price !== undefined && it.priceDay === undefined) it.priceDay = it.price;
+          }
         }
+
+        // Import with userId stamped
+        if (data.events) { for (const ev of data.events) { ev.userId = uid; ev.synced = 1; } await db.events.bulkPut(data.events); }
         if (data.equipmentPackages) { for (const p of data.equipmentPackages) p.userId = uid; await db.equipmentPackages.bulkPut(data.equipmentPackages); }
         if (data.eventPersonnel) { for (const p of data.eventPersonnel) p.userId = uid; await db.eventPersonnel.bulkPut(data.eventPersonnel); }
         if (data.settings) { for (const s of data.settings) s.userId = uid; await db.settings.bulkPut(data.settings); }
@@ -1978,7 +1996,6 @@ const app = {
         if (data.timeline) { for (const t of data.timeline) t.userId = uid; await db.timeline.bulkPut(data.timeline); }
         if (data.equipmentItems) { for (const it of data.equipmentItems) it.userId = uid; await db.equipmentItems.bulkPut(data.equipmentItems); }
         if (data.equipmentCatalog) { for (const c of data.equipmentCatalog) c.userId = uid; await db.equipmentCatalog.bulkPut(data.equipmentCatalog); }
-        if (data.equipmentPackages) { for (const p of data.equipmentPackages) p.userId = uid; await db.equipmentPackages.bulkPut(data.equipmentPackages); }
         if (data.payments) { for (const p of data.payments) p.userId = uid; await db.payments.bulkPut(data.payments); }
         if (data.eventTodos) { for (const t of data.eventTodos) t.userId = uid; await db.eventTodos.bulkPut(data.eventTodos); }
         UI.toast('Daten importiert', 'success');

@@ -84,12 +84,14 @@ const API = {
       const remote = await API.events.list();
       for (const r of remote) {
         const local = await db.events.get(r.id);
+        const statusMap = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt', confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' };
         const obj = {
           id: r.id,
           userId: r.user_id,
           orderNumber: r.order_number,
           orderType: r.order_type || 'event',
           status: r.status,
+          statusLabel: statusMap[r.status] || r.status,
           eventType: r.event_type,
           date: r.date,
           clientName: r.client_name,

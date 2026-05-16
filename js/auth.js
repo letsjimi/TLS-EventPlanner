@@ -142,6 +142,8 @@ const Auth = {
   // LOGOUT
   // ═══════════════════════════════════════════════
   logout() {
+    API.token = null;
+    localStorage.removeItem('jwt');
     this.currentUser = null;
     location.reload();
   },

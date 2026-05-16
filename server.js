@@ -429,10 +429,24 @@ app.post('/api/import/full', authMW, async (req, res) => {
 
     if (data.events) {
       for (const ev of data.events) {
+        // Normalize snake_case -> camelCase and back for robustness
+        const orderNumber = ev.orderNumber != null ? ev.orderNumber : (ev.order_number != null ? ev.order_number : 'IMPORT-' + Date.now());
+        const orderType   = ev.orderType   != null ? ev.orderType   : (ev.order_type   != null ? ev.order_type   : 'event');
+        const status      = ev.status      != null ? ev.status      : (ev.status      != null ? ev.status      : 'inquiry');
+        const eventType   = ev.eventType   != null ? ev.eventType   : ev.event_type;
+        const date        = ev.date        != null ? ev.date        : (ev.date        != null ? ev.date        : new Date().toISOString().slice(0,10));
+        const clientName  = ev.clientName  != null ? ev.clientName  : ev.client_name;
+        const locations   = ev.locations   != null ? ev.locations   : (ev.locations   != null ? ev.locations   : '');
+        const totalPrice  = ev.totalPrice  != null ? ev.totalPrice  : (ev.total_price  != null ? ev.total_price  : 0);
+        const deposit     = ev.deposit     != null ? ev.deposit     : (ev.deposit     != null ? ev.deposit     : 0);
+        const remaining   = ev.remaining   != null ? ev.remaining   : (ev.remaining   != null ? ev.remaining   : (totalPrice - deposit));
+        const notes       = ev.notes       != null ? ev.notes       : (ev.notes       != null ? ev.notes       : '');
+        const km          = ev.km          != null ? ev.km          : (ev.km          != null ? ev.km          : 0);
+        const duration    = ev.duration    != null ? ev.duration    : (ev.duration    != null ? ev.duration    : 1);
         const result = await dbRun(
           `INSERT INTO events (user_id, order_number, order_type, status, event_type, date, client_name, locations, total_price, deposit, remaining, notes, km, duration)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uid, ev.orderNumber, ev.orderType || 'event', ev.status || 'inquiry', ev.eventType, ev.date, ev.clientName, ev.locations, ev.totalPrice || 0, ev.deposit || 0, (ev.totalPrice || 0) - (ev.deposit || 0), ev.notes, ev.km || 0, ev.duration || 1]
+          [uid, orderNumber, orderType, status, eventType, date, clientName, locations, totalPrice, deposit, remaining, notes, km, duration]
         );
         eventIdMap[ev.id] = result.lastID;
       }
@@ -472,10 +486,11 @@ app.post('/api/import/full', authMW, async (req, res) => {
     }
     if (data.equipmentItems) {
       for (const it of data.equipmentItems) {
+        const price = it.priceDay !== undefined ? it.priceDay : (it.price || 0);
         await dbRun(
           `INSERT INTO equipment_items (event_id, category, name, qty, unit, price, needed, packed, note, source, is_external)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [mapEventId(it.eventId), it.category, it.name, it.qty || 1, it.unit || 'Stk', it.price || 0, it.needed !== false ? 1 : 0, it.packed ? 1 : 0, it.note || '', it.source || 'catalog', it.isExternal ? 1 : 0]
+          [mapEventId(it.eventId), it.category, it.name, it.qty || 1, it.unit || 'Stk', price, it.needed !== false ? 1 : 0, it.packed ? 1 : 0, it.note || '', it.source || 'catalog', it.isExternal ? 1 : 0]
         );
       }
     }
@@ -505,9 +520,11 @@ app.post('/api/import/full', authMW, async (req, res) => {
     }
     if (data.eventTodos) {
       for (const t of data.eventTodos) {
+        const eid = mapEventId(t.eventId !== undefined ? t.eventId : t.event_id);
+        const dueDate = t.dueDate !== undefined ? t.dueDate : t.due_date;
         await dbRun(
           `INSERT INTO event_todos (event_id, title, due_date, done) VALUES (?, ?, ?, ?)`,
-          [mapEventId(t.event_id), t.title, t.due_date, t.done ? 1 : 0]
+          [eid, t.title, dueDate, t.done ? 1 : 0]
         );
       }
     }
