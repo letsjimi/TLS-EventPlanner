@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.env
+
+# Deployment watch state
+.watch-deploy.state
+.watch-deploy.pid
+
+# Database (local dev)
+data/tms.db

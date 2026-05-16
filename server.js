@@ -90,6 +90,7 @@ async function initSchema() {
       remaining REAL DEFAULT 0,
       notes TEXT,
       km INTEGER DEFAULT 0,
+      duration INTEGER DEFAULT 1,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
@@ -100,6 +101,13 @@ async function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       event_id INTEGER NOT NULL,
       name TEXT,
+      address TEXT,
+      km INTEGER DEFAULT 0,
+      setup_time TEXT,
+      soundcheck TEXT,
+      notes TEXT,
+      contact_name TEXT,
+      contact_phone TEXT,
       sort_order INTEGER DEFAULT 0
     )
   `);
@@ -111,7 +119,10 @@ async function initSchema() {
       role TEXT,
       name TEXT,
       phone TEXT,
-      email TEXT
+      email TEXT,
+      responsibility TEXT,
+      notes TEXT,
+      availability TEXT
     )
   `);
 
@@ -121,6 +132,11 @@ async function initSchema() {
       event_id INTEGER NOT NULL,
       time TEXT,
       title TEXT,
+      detail TEXT,
+      location TEXT,
+      duration TEXT,
+      crew TEXT,
+      done INTEGER DEFAULT 0,
       sort_order INTEGER DEFAULT 0
     )
   `);
@@ -134,7 +150,11 @@ async function initSchema() {
       qty INTEGER DEFAULT 1,
       unit TEXT DEFAULT 'Stk',
       price REAL,
-      needed INTEGER DEFAULT 1
+      needed INTEGER DEFAULT 1,
+      packed INTEGER DEFAULT 0,
+      note TEXT DEFAULT '',
+      source TEXT DEFAULT 'catalog',
+      is_external INTEGER DEFAULT 0
     )
   `);
 
@@ -147,6 +167,7 @@ async function initSchema() {
       tags TEXT,
       unit TEXT DEFAULT 'Stk',
       price_day REAL DEFAULT 0,
+      stock INTEGER DEFAULT 1,
       is_external INTEGER DEFAULT 0
     )
   `);
@@ -156,6 +177,7 @@ async function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       name TEXT,
+      description TEXT,
       tags TEXT,
       items TEXT
     )
@@ -273,9 +295,9 @@ app.put('/api/events/:id', authMW, async (req, res) => {
   const event = await dbGet(`SELECT * FROM events WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id]);
   if (!event) return res.status(404).json({ error: 'Not found' });
   await dbRun(
-    `UPDATE events SET order_number=?, order_type=?, status=?, event_type=?, date=?, client_name=?, locations=?, total_price=?, deposit=?, remaining=?, notes=?, km=?, updated_at=CURRENT_TIMESTAMP
+    `UPDATE events SET order_number=?, order_type=?, status=?, event_type=?, date=?, client_name=?, locations=?, total_price=?, deposit=?, remaining=?, notes=?, km=?, duration=?, updated_at=CURRENT_TIMESTAMP
      WHERE id = ?`,
-    [d.orderNumber, d.orderType, d.status, d.eventType, d.date, d.clientName, d.locations, d.totalPrice, d.deposit, d.remaining, d.notes, d.km, req.params.id]
+    [d.orderNumber, d.orderType, d.status, d.eventType, d.date, d.clientName, d.locations, d.totalPrice, d.deposit, d.remaining, d.notes, d.km, d.duration||1, req.params.id]
   );
   res.json({ success: true });
 });
@@ -312,16 +334,16 @@ app.get('/api/equipment-catalog', authMW, async (req, res) => {
 app.post('/api/equipment-catalog', authMW, async (req, res) => {
   const d = req.body;
   const result = await dbRun(
-    `INSERT INTO equipment_catalog (user_id, category, name, tags, unit, price_day, is_external) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [req.user.id, d.category, d.name, d.tags, d.unit, d.priceDay, d.isExternal ? 1 : 0]
+    `INSERT INTO equipment_catalog (user_id, category, name, tags, unit, price_day, stock, is_external) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [req.user.id, d.category, d.name, d.tags, d.unit, d.priceDay, d.stock, d.isExternal ? 1 : 0]
   );
   res.json({ id: result.lastID });
 });
 
 app.put('/api/equipment-catalog/:id', authMW, async (req, res) => {
   const d = req.body;
-  await dbRun(`UPDATE equipment_catalog SET category=?, name=?, tags=?, unit=?, price_day=?, is_external=? WHERE id = ? AND user_id = ?`,
-    [d.category, d.name, d.tags, d.unit, d.priceDay, d.isExternal ? 1 : 0, req.params.id, req.user.id]);
+  await dbRun(`UPDATE equipment_catalog SET category=?, name=?, tags=?, unit=?, price_day=?, stock=?, is_external=? WHERE id = ? AND user_id = ?`,
+    [d.category, d.name, d.tags, d.unit, d.priceDay, d.stock, d.isExternal ? 1 : 0, req.params.id, req.user.id]);
   res.json({ success: true });
 });
 
@@ -340,8 +362,8 @@ app.get('/api/equipment-packages', authMW, async (req, res) => {
 app.post('/api/equipment-packages', authMW, async (req, res) => {
   const d = req.body;
   const result = await dbRun(
-    `INSERT INTO equipment_packages (user_id, name, tags, items) VALUES (?, ?, ?, ?)`,
-    [req.user.id, d.name, d.tags, JSON.stringify(d.items || [])]
+    `INSERT INTO equipment_packages (user_id, name, description, tags, items) VALUES (?, ?, ?, ?, ?)`,
+    [req.user.id, d.name, d.description || '', d.tags, JSON.stringify(d.items || [])]
   );
   res.json({ id: result.lastID });
 });
@@ -376,9 +398,16 @@ app.get('/api/export/full', authMW, async (req, res) => {
   const uid = req.user.id;
   const data = {};
   data.events = await dbAll(`SELECT * FROM events WHERE user_id = ?`, [uid]);
+  data.locations = await dbAll(`SELECT l.* FROM locations l JOIN events e ON l.event_id = e.id WHERE e.user_id = ?`, [uid]);
+  data.contacts = await dbAll(`SELECT c.* FROM contacts c JOIN events e ON c.event_id = e.id WHERE e.user_id = ?`, [uid]);
+  data.timeline = await dbAll(`SELECT t.* FROM timeline t JOIN events e ON t.event_id = e.id WHERE e.user_id = ?`, [uid]);
+  data.equipmentItems = await dbAll(`SELECT ei.* FROM equipment_items ei JOIN events e ON ei.event_id = e.id WHERE e.user_id = ?`, [uid]);
   data.equipmentCatalog = await dbAll(`SELECT * FROM equipment_catalog WHERE user_id = ?`, [uid]);
   data.equipmentPackages = await dbAll(`SELECT * FROM equipment_packages WHERE user_id = ?`, [uid]);
+  data.payments = await dbAll(`SELECT p.* FROM payments p JOIN events e ON p.event_id = e.id WHERE e.user_id = ?`, [uid]);
+  data.eventTodos = await dbAll(`SELECT et.* FROM event_todos et JOIN events e ON et.event_id = e.id WHERE e.user_id = ?`, [uid]);
   data.eventPersonnel = await dbAll(`SELECT ep.* FROM event_personnel ep JOIN events e ON ep.event_id = e.id WHERE e.user_id = ?`, [uid]);
+  data.settings = await dbAll(`SELECT * FROM settings WHERE user_id = ?`, [uid]);
   res.json(data);
 });
 
@@ -387,44 +416,109 @@ app.post('/api/import/full', authMW, async (req, res) => {
   try {
     const uid = req.user.id;
     const data = req.body;
+    const eventIdMap = {}; // old eventId -> new SQLite event id
+
     if (data.events) {
       for (const ev of data.events) {
-        ev.userId = uid;
+        const result = await dbRun(
+          `INSERT INTO events (user_id, order_number, order_type, status, event_type, date, client_name, locations, total_price, deposit, remaining, notes, km, duration)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uid, ev.orderNumber, ev.orderType || 'event', ev.status || 'inquiry', ev.eventType, ev.date, ev.clientName, ev.locations, ev.totalPrice || 0, ev.deposit || 0, (ev.totalPrice || 0) - (ev.deposit || 0), ev.notes, ev.km || 0, ev.duration || 1]
+        );
+        eventIdMap[ev.id] = result.lastID;
+      }
+    }
+
+    function mapEventId(oldId) {
+      const mapped = eventIdMap[oldId];
+      return mapped !== undefined ? mapped : oldId;
+    }
+
+    if (data.locations) {
+      for (const l of data.locations) {
         await dbRun(
-          `INSERT INTO events (user_id, order_number, order_type, status, event_type, date, client_name, locations, total_price, deposit, remaining, notes, km)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uid, ev.orderNumber, ev.orderType || 'event', ev.status || 'inquiry', ev.eventType, ev.date, ev.clientName, ev.locations, ev.totalPrice || 0, ev.deposit || 0, (ev.totalPrice || 0) - (ev.deposit || 0), ev.notes, ev.km || 0]
+          `INSERT INTO locations (event_id, name, address, km, setup_time, soundcheck, notes, contact_name, contact_phone, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [mapEventId(l.eventId), l.name, l.address, l.km || 0, l.setupTime, l.soundcheck, l.notes, l.contactName, l.contactPhone, l.sortOrder || 0]
+        );
+      }
+    }
+    if (data.contacts) {
+      for (const c of data.contacts) {
+        await dbRun(
+          `INSERT INTO contacts (event_id, role, name, phone, email, responsibility, notes, availability)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [mapEventId(c.eventId), c.role, c.name, c.phone, c.email, c.responsibility, c.notes, c.availability]
+        );
+      }
+    }
+    if (data.timeline) {
+      for (const t of data.timeline) {
+        await dbRun(
+          `INSERT INTO timeline (event_id, time, title, detail, location, duration, crew, done, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [mapEventId(t.eventId), t.time, t.title, t.detail, t.location, t.duration, t.crew, t.done ? 1 : 0, t.sortOrder || 0]
+        );
+      }
+    }
+    if (data.equipmentItems) {
+      for (const it of data.equipmentItems) {
+        await dbRun(
+          `INSERT INTO equipment_items (event_id, category, name, qty, unit, price, needed, packed, note, source, is_external)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [mapEventId(it.eventId), it.category, it.name, it.qty || 1, it.unit || 'Stk', it.price || 0, it.needed !== false ? 1 : 0, it.packed ? 1 : 0, it.note || '', it.source || 'catalog', it.isExternal ? 1 : 0]
         );
       }
     }
     if (data.equipmentCatalog) {
       for (const c of data.equipmentCatalog) {
         await dbRun(
-          `INSERT INTO equipment_catalog (user_id, category, name, tags, unit, price_day, is_external) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [uid, c.category, c.name, c.tags, c.unit, c.priceDay, c.isExternal ? 1 : 0]
+          `INSERT INTO equipment_catalog (user_id, category, name, tags, unit, price_day, stock, is_external) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uid, c.category, c.name, c.tags, c.unit, c.priceDay, c.stock, c.isExternal ? 1 : 0]
         );
       }
     }
     if (data.equipmentPackages) {
       for (const p of data.equipmentPackages) {
         await dbRun(
-          `INSERT INTO equipment_packages (user_id, name, tags, items) VALUES (?, ?, ?, ?)`,
-          [uid, p.name, p.tags, JSON.stringify(p.items || [])]
+          `INSERT INTO equipment_packages (user_id, name, description, tags, items) VALUES (?, ?, ?, ?, ?)`,
+          [uid, p.name, p.description || '', p.tags, JSON.stringify(p.items || [])]
+        );
+      }
+    }
+    if (data.payments) {
+      for (const p of data.payments) {
+        await dbRun(
+          `INSERT INTO payments (event_id, type, amount, due_date, status) VALUES (?, ?, ?, ?, ?)`,
+          [mapEventId(p.eventId), p.type, p.amount || 0, p.dueDate, p.status || 'offen']
+        );
+      }
+    }
+    if (data.eventTodos) {
+      for (const t of data.eventTodos) {
+        await dbRun(
+          `INSERT INTO event_todos (event_id, title, due_date, done) VALUES (?, ?, ?, ?)`,
+          [mapEventId(t.eventId), t.title, t.dueDate, t.done ? 1 : 0]
         );
       }
     }
     if (data.eventPersonnel) {
       for (const p of data.eventPersonnel) {
-        const ev = await dbGet(`SELECT id FROM events WHERE order_number = ? AND user_id = ?`, [p.eventId.toString(), uid]);
-        if (ev) {
-          await dbRun(
-            `INSERT INTO event_personnel (event_id, role, qty, unit, price, needed, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [ev.id, p.role, p.qty, p.unit, p.price, p.needed !== false ? 1 : 0, p.sortOrder || 0]
-          );
-        }
+        await dbRun(
+          `INSERT INTO event_personnel (event_id, role, qty, unit, price, needed, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [mapEventId(p.eventId), p.role, p.qty || 1, p.unit || 'Pauschale', p.price || 0, p.needed !== false ? 1 : 0, p.sortOrder || 0]
+        );
       }
     }
-    res.json({ success: true });
+    if (data.settings) {
+      for (const s of data.settings) {
+        await dbRun(
+          `INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?, ?, ?)`,
+          [uid, s.key, s.value]
+        );
+      }
+    }
+    res.json({ success: true, importedEvents: Object.keys(eventIdMap).length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

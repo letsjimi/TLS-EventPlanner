@@ -28,8 +28,8 @@ const app = {
     this.bindMobileMenu();
     this.bindGlobalSearch();
     this.navigate(location.hash || '#dashboard');
-    window.addEventListener('hashchange', () => this.navigate(location.hash));
-    lucide.createIcons();
+    // Auto-sync if online
+    if (API.token) API.sync.all().catch(console.warn);
   },
 
   // ═══════════════════════════════════════════════
@@ -566,20 +566,45 @@ const app = {
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
         data.userId = Auth.userId || 1;
-        const id = await db.events.add(data);
+
+        let id;
+        if (API.token) {
+          try {
+            const res = await API.events.create(data);
+            id = res.id;
+            data.id = id;
+            await db.events.add(data);
+          } catch(e) {
+            console.warn('API create failed, falling back to local:', e.message);
+            id = await db.events.add(data);
+          }
+        } else {
+          id = await db.events.add(data);
+        }
+
+        data.id = id;
+
         // Default Personnel für Events (außer Verleih)
         if (data.orderType !== 'rental') {
-          await db.eventPersonnel.bulkAdd([
+          const pers = [
             { eventId: id, role: 'Haupttechniker (Sound/Licht)', qty: 1, unit: 'Pauschale', price: 650, needed: true, sortOrder: 1 },
             { eventId: id, role: 'Hilfskraft (Aufbau/Abbau)', qty: 1, unit: 'Pauschale', price: 200, needed: true, sortOrder: 2 },
             { eventId: id, role: 'Anfahrt', qty: data.km || 0, unit: 'km', price: 0.70, needed: true, sortOrder: 3 },
             { eventId: id, role: 'Verpflegung', qty: 2, unit: 'Pers.', price: 25, needed: true, sortOrder: 4 }
-          ]);
+          ];
+          if (API.token) {
+            try { await API.personnel.save(id, pers); } catch(e) { console.warn('API personnel failed:', e.message); }
+          }
+          await db.eventPersonnel.bulkAdd(pers);
         } else {
-          // Für Verleih: nur Anfahrt, kein Personal
-          await db.eventPersonnel.bulkAdd([
+          // Für Verleih: nur Anfahrt
+          const pers = [
             { eventId: id, role: 'Anfahrt / Lieferung', qty: data.km || 0, unit: 'km', price: 0.70, needed: true, sortOrder: 1 }
-          ]);
+          ];
+          if (API.token) {
+            try { await API.personnel.save(id, pers); } catch(e) { console.warn('API personnel failed:', e.message); }
+          }
+          await db.eventPersonnel.bulkAdd(pers);
         }
         UI.toast('Auftrag erstellt: ' + data.orderNumber, 'success');
         this.navigate('#events');
@@ -633,6 +658,9 @@ const app = {
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
         data.userId = Auth.userId || 1;
+        if (API.token) {
+          try { await API.events.update(id, data); } catch(e) { console.warn('API update failed:', e.message); }
+        }
         await db.events.update(id, data);
         UI.toast('Auftrag aktualisiert', 'success');
         this.navigate('#events');
@@ -642,11 +670,16 @@ const app = {
 
   async deleteEvent(id) {
     UI.confirm('Diesen Auftrag wirklich löschen? Alle zugehörigen Daten (Locations, Kontakte, Equipment) werden ebenfalls gelöscht.', async () => {
+      if (API.token) {
+        try { await API.events.remove(id); } catch(e) { console.warn('API delete failed:', e.message); }
+      }
       await db.locations.where('eventId').equals(id).delete();
       await db.contacts.where('eventId').equals(id).delete();
       await db.timeline.where('eventId').equals(id).delete();
       await db.equipmentItems.where('eventId').equals(id).delete();
       await db.payments.where('eventId').equals(id).delete();
+      await db.eventTodos.where('eventId').equals(id).delete();
+      await db.eventPersonnel.where('eventId').equals(id).delete();
       await db.events.delete(id);
       UI.toast('Auftrag gelöscht', 'info');
       this.navigate('#events');
@@ -1862,16 +1895,19 @@ const app = {
   // EXPORT / IMPORT
   // ═══════════════════════════════════════════════
   async exportData() {
+    const userEventIds = (await db.events.where('userId').equals(Auth.userId || 1).toArray()).map(e => e.id);
     const data = {
       events: await db.events.where('userId').equals(Auth.userId || 1).toArray(),
-      userEventIds: (await db.events.where('userId').equals(Auth.userId || 1).toArray()).map(e => e.id),
       locations: (await db.locations.toArray()).filter(l => userEventIds.includes(l.eventId)),
       contacts: (await db.contacts.toArray()).filter(c => userEventIds.includes(c.eventId)),
       timeline: (await db.timeline.toArray()).filter(t => userEventIds.includes(t.eventId)),
       equipmentItems: (await db.equipmentItems.toArray()).filter(it => userEventIds.includes(it.eventId)),
       equipmentCatalog: await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray(),
+      equipmentPackages: await db.equipmentPackages.where('userId').equals(Auth.userId || 1).toArray(),
       payments: (await db.payments.toArray()).filter(p => userEventIds.includes(p.eventId)),
       eventTodos: (await db.eventTodos.toArray()).filter(t => userEventIds.includes(t.eventId)),
+      eventPersonnel: (await db.eventPersonnel.toArray()).filter(p => userEventIds.includes(p.eventId)),
+      settings: await db.settings.where('userId').equals(Auth.userId || 1).toArray(),
       exportedAt: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1914,6 +1950,9 @@ const app = {
           for (const ev of data.events) ev.userId = uid;
           await db.events.bulkPut(data.events);
         }
+        if (data.equipmentPackages) { for (const p of data.equipmentPackages) p.userId = uid; await db.equipmentPackages.bulkPut(data.equipmentPackages); }
+        if (data.eventPersonnel) { for (const p of data.eventPersonnel) p.userId = uid; await db.eventPersonnel.bulkPut(data.eventPersonnel); }
+        if (data.settings) { for (const s of data.settings) s.userId = uid; await db.settings.bulkPut(data.settings); }
         if (data.locations) { for (const l of data.locations) l.userId = uid; await db.locations.bulkPut(data.locations); }
         if (data.contacts) { for (const c of data.contacts) c.userId = uid; await db.contacts.bulkPut(data.contacts); }
         if (data.timeline) { for (const t of data.timeline) t.userId = uid; await db.timeline.bulkPut(data.timeline); }
