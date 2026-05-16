@@ -283,9 +283,9 @@ app.get('/api/events', authMW, async (req, res) => {
 app.post('/api/events', authMW, async (req, res) => {
   const d = req.body;
   const result = await dbRun(
-    `INSERT INTO events (user_id, order_number, order_type, status, event_type, date, client_name, locations, total_price, deposit, remaining, notes, km)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [req.user.id, d.orderNumber, d.orderType || 'event', d.status || 'inquiry', d.eventType, d.date, d.clientName, d.locations, d.totalPrice || 0, d.deposit || 0, (d.totalPrice || 0) - (d.deposit || 0), d.notes, d.km || 0]
+    `INSERT INTO events (user_id, order_number, order_type, status, event_type, date, client_name, locations, total_price, deposit, remaining, notes, km, duration)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [req.user.id, d.orderNumber, d.orderType || 'event', d.status || 'inquiry', d.eventType, d.date, d.clientName, d.locations, d.totalPrice || 0, d.deposit || 0, (d.totalPrice || 0) - (d.deposit || 0), d.notes, d.km || 0, d.duration || 1]
   );
   res.json({ id: result.lastID });
 });

@@ -99,6 +99,7 @@ const API = {
           remaining: r.remaining,
           notes: r.notes,
           km: r.km,
+          duration: r.duration || 1,
           synced: 1
         };
         if (!local) await db.events.add(obj);
@@ -129,6 +130,7 @@ const API = {
           tags: r.tags,
           unit: r.unit,
           priceDay: r.price_day,
+          stock: r.stock || 1,
           isExternal: r.is_external,
           synced: 1
         };
