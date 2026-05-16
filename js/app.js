@@ -566,6 +566,7 @@ const app = {
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
         data.userId = Auth.userId || 1;
+        data.synced = API.token ? 0 : 1;
 
         let id;
         if (API.token) {
@@ -619,6 +620,10 @@ const app = {
     const fields = [
       { name: 'orderNumber', label: 'Auftrags-Nr' },
       { name: 'date', label: 'Datum', type: 'date' },
+      { name: 'orderType', label: 'Auftrags-Art', type: 'select', options: [
+        { value: 'event', label: '🎉 Event (mit Service & Personal)' },
+        { value: 'rental', label: '📦 Nur Verleih (Equipment-Miete)' }
+      ]},
       { name: 'eventType', label: 'Event-Typ', type: 'select', options: [
         { value: 'Hochzeit', label: 'Hochzeit' },
         { value: 'Firmenfeier', label: 'Firmenfeier' },
@@ -2098,6 +2103,9 @@ const app = {
       </div>
     `, async () => {
       // Delete old and add new
+      if (API.token) {
+        try { await API.personnel.save(this.currentEventId, personnel); } catch(e) { console.warn('API personnel save failed:', e.message); }
+      }
       await db.eventPersonnel.where('eventId').equals(this.currentEventId).delete();
       if (personnel.length > 0) {
         for (let i = 0; i < personnel.length; i++) {
@@ -2998,6 +3006,7 @@ const app = {
       const now = new Date();
       data.orderNumber = 'TLS-' + now.getFullYear() + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(count + 1).padStart(3,'0');
       data.status = 'inquiry';
+      data.statusLabel = 'Anfrage';
       data.date = dateStr;
       data.userId = Auth.userId || 1;
       data.orderType = 'event';

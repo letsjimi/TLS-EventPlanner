@@ -132,6 +132,7 @@ async function seedDatabase() {
   // ── Events (userId = 1) ──
   const ev1 = await db.events.add({
     userId: 1, orderNumber: 'TLS-2026-001', date: '2026-05-10', eventType: 'Hochzeit',
+    orderType: 'event', synced: 1,
     clientName: 'Schneider & Müller', locations: 'Kirche St. Peter → Festhalle Rüsselsheim',
     totalPrice: 2850.00, deposit: 850.00, remaining: 2000.00, status: 'confirmed',
     statusLabel: 'Bestätigt',
@@ -140,6 +141,7 @@ async function seedDatabase() {
   });
   const ev2 = await db.events.add({
     userId: 1, orderNumber: 'TLS-2026-002', date: '2026-05-20', eventType: 'Firmenfeier',
+    orderType: 'event', synced: 1,
     clientName: 'ABC GmbH Frankfurt', locations: 'Kongresszentrum Frankfurt',
     totalPrice: 1850.00, deposit: 500.00, remaining: 1350.00, status: 'offer',
     statusLabel: 'Angebot',
@@ -148,6 +150,7 @@ async function seedDatabase() {
   });
   const ev3 = await db.events.add({
     userId: 1, orderNumber: 'TLS-2026-003', date: '2026-06-05', eventType: 'Konzert',
+    orderType: 'event', synced: 1,
     clientName: 'Musikverein Darmstadt', locations: 'Jazzclub Darmstadt',
     totalPrice: 1200.00, deposit: 0, remaining: 1200.00, status: 'inquiry',
     statusLabel: 'Anfrage',
