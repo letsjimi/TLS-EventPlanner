@@ -39,6 +39,35 @@ const API = {
     remove: (id)     => API.del('/api/events/' + id),
   },
 
+  locations: {
+    list: (eid)      => API.get('/api/events/' + eid + '/locations'),
+    save: (eid, arr)=> API.put('/api/events/' + eid + '/locations', arr),
+  },
+  contacts: {
+    list: (eid)      => API.get('/api/events/' + eid + '/contacts'),
+    save: (eid, arr) => API.put('/api/events/' + eid + '/contacts', arr),
+  },
+  timeline: {
+    list: (eid)      => API.get('/api/events/' + eid + '/timeline'),
+    save: (eid, arr) => API.put('/api/events/' + eid + '/timeline', arr),
+  },
+  equipment: {
+    list: (eid)      => API.get('/api/events/' + eid + '/equipment-items'),
+    save: (eid, arr) => API.put('/api/events/' + eid + '/equipment-items', arr),
+  },
+  payments: {
+    list: (eid)      => API.get('/api/events/' + eid + '/payments'),
+    save: (eid, arr) => API.put('/api/events/' + eid + '/payments', arr),
+  },
+  todos: {
+    list: (eid)      => API.get('/api/events/' + eid + '/todos'),
+    save: (eid, arr) => API.put('/api/events/' + eid + '/todos', arr),
+  },
+  settings: {
+    list: ()         => API.get('/api/settings'),
+    save: (arr)      => API.put('/api/settings', arr),
+  },
+
   personnel: {
     list: (eid)      => API.get('/api/events/' + eid + '/personnel'),
     save: (eid, arr) => API.put('/api/events/' + eid + '/personnel', arr),
@@ -124,7 +153,73 @@ const API = {
         };
         if (!local) await db.events.add(obj);
         else await db.events.update(r.id, obj);
+        // Pull nested data for this event
+        await API.sync.pullEventData(r.id);
       }
+    },
+
+    async pullEventData(eventId) {
+      if (!API.token) return;
+      try {
+        const [locations, contacts, timeline, equipmentItems, payments, eventTodos, eventPersonnel] = await Promise.all([
+          API.locations.list(eventId),
+          API.contacts.list(eventId),
+          API.timeline.list(eventId),
+          API.equipment.list(eventId),
+          API.payments.list(eventId),
+          API.todos.list(eventId),
+          API.personnel.list(eventId)
+        ]);
+        if (locations) {
+          await db.locations.where('eventId').equals(eventId).delete();
+          await db.locations.bulkAdd((locations || []).map(l => ({
+            eventId: l.event_id, name: l.name, address: l.address, km: l.km,
+            setupTime: l.setup_time, soundcheck: l.soundcheck, notes: l.notes,
+            contactName: l.contact_name, contactPhone: l.contact_phone, sortOrder: l.sort_order
+          })));
+        }
+        if (contacts) {
+          await db.contacts.where('eventId').equals(eventId).delete();
+          await db.contacts.bulkAdd((contacts || []).map(c => ({
+            eventId: c.event_id, role: c.role, name: c.name, phone: c.phone,
+            email: c.email, responsibility: c.responsibility, notes: c.notes, availability: c.availability
+          })));
+        }
+        if (timeline) {
+          await db.timeline.where('eventId').equals(eventId).delete();
+          await db.timeline.bulkAdd((timeline || []).map(t => ({
+            eventId: t.event_id, time: t.time, title: t.title, detail: t.detail,
+            location: t.location, duration: t.duration, crew: t.crew, done: !!t.done, sortOrder: t.sort_order
+          })));
+        }
+        if (equipmentItems) {
+          await db.equipmentItems.where('eventId').equals(eventId).delete();
+          await db.equipmentItems.bulkAdd((equipmentItems || []).map(it => ({
+            eventId: it.event_id, category: it.category, name: it.name, qty: it.qty, unit: it.unit,
+            priceDay: it.price !== undefined ? it.price : it.price_day, needed: !!it.needed, packed: !!it.packed,
+            note: it.note || '', source: it.source || 'catalog', isExternal: !!it.is_external
+          })));
+        }
+        if (payments) {
+          await db.payments.where('eventId').equals(eventId).delete();
+          await db.payments.bulkAdd((payments || []).map(p => ({
+            eventId: p.event_id, type: p.type, amount: p.amount, dueDate: p.due_date, status: p.status
+          })));
+        }
+        if (eventTodos) {
+          await db.eventTodos.where('eventId').equals(eventId).delete();
+          await db.eventTodos.bulkAdd((eventTodos || []).map(t => ({
+            eventId: t.event_id, title: t.title, dueDate: t.due_date, done: !!t.done
+          })));
+        }
+        if (eventPersonnel) {
+          await db.eventPersonnel.where('eventId').equals(eventId).delete();
+          await db.eventPersonnel.bulkAdd((eventPersonnel || []).map(p => ({
+            eventId: p.event_id, role: p.role, qty: p.qty, unit: p.unit,
+            price: p.price, needed: !!p.needed, sortOrder: p.sort_order
+          })));
+        }
+      } catch (e) { console.warn('pullEventData failed', e); }
     },
 
     async pushCatalog() {

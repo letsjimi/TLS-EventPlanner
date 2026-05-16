@@ -303,7 +303,7 @@ app.put('/api/events/:id', authMW, async (req, res) => {
   const locations   = d.locations   !== undefined ? d.locations   : event.locations;
   const totalPrice  = d.totalPrice  !== undefined ? d.totalPrice  : event.total_price;
   const deposit     = d.deposit     !== undefined ? d.deposit     : event.deposit;
-  const remaining   = d.remaining   !== undefined ? d.remaining   : (totalPrice - deposit);
+  const remaining   = d.remaining   !== undefined ? d.remaining   : event.remaining;
   const notes       = d.notes       !== undefined ? d.notes       : event.notes;
   const km          = d.km          !== undefined ? d.km          : event.km;
   const duration    = d.duration    !== undefined ? d.duration    : event.duration;
@@ -326,6 +326,132 @@ app.delete('/api/events/:id', authMW, async (req, res) => {
   await dbRun(`DELETE FROM event_todos WHERE event_id = ?`, [id]);
   await dbRun(`DELETE FROM event_personnel WHERE event_id = ?`, [id]);
   await dbRun(`DELETE FROM events WHERE id = ? AND user_id = ?`, [id, uid]);
+  res.json({ success: true });
+});
+
+// ─── Locations ───────────────────────────────
+app.get('/api/events/:id/locations', authMW, async (req, res) => {
+  const rows = await dbAll(`SELECT * FROM locations WHERE event_id = ? ORDER BY sort_order`, [req.params.id]);
+  res.json(rows);
+});
+
+app.put('/api/events/:id/locations', authMW, async (req, res) => {
+  const rows = req.body;
+  await dbRun(`DELETE FROM locations WHERE event_id = ?`, [req.params.id]);
+  for (const l of rows) {
+    await dbRun(
+      `INSERT INTO locations (event_id, name, address, km, setup_time, soundcheck, notes, contact_name, contact_phone, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.id, l.name, l.address, l.km || 0, l.setupTime, l.soundcheck, l.notes, l.contactName, l.contactPhone, l.sortOrder || 0]
+    );
+  }
+  res.json({ success: true });
+});
+
+// ─── Contacts ───────────────────────────────
+app.get('/api/events/:id/contacts', authMW, async (req, res) => {
+  const rows = await dbAll(`SELECT * FROM contacts WHERE event_id = ?`, [req.params.id]);
+  res.json(rows);
+});
+
+app.put('/api/events/:id/contacts', authMW, async (req, res) => {
+  const rows = req.body;
+  await dbRun(`DELETE FROM contacts WHERE event_id = ?`, [req.params.id]);
+  for (const c of rows) {
+    await dbRun(
+      `INSERT INTO contacts (event_id, role, name, phone, email, responsibility, notes, availability) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.id, c.role, c.name, c.phone, c.email, c.responsibility, c.notes, c.availability]
+    );
+  }
+  res.json({ success: true });
+});
+
+// ─── Timeline ───────────────────────────────
+app.get('/api/events/:id/timeline', authMW, async (req, res) => {
+  const rows = await dbAll(`SELECT * FROM timeline WHERE event_id = ? ORDER BY sort_order`, [req.params.id]);
+  res.json(rows);
+});
+
+app.put('/api/events/:id/timeline', authMW, async (req, res) => {
+  const rows = req.body;
+  await dbRun(`DELETE FROM timeline WHERE event_id = ?`, [req.params.id]);
+  for (const t of rows) {
+    await dbRun(
+      `INSERT INTO timeline (event_id, time, title, detail, location, duration, crew, done, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.id, t.time, t.title, t.detail, t.location, t.duration, t.crew, t.done ? 1 : 0, t.sortOrder || 0]
+    );
+  }
+  res.json({ success: true });
+});
+
+// ─── Equipment Items ────────────────────────
+app.get('/api/events/:id/equipment-items', authMW, async (req, res) => {
+  const rows = await dbAll(`SELECT * FROM equipment_items WHERE event_id = ?`, [req.params.id]);
+  res.json(rows);
+});
+
+app.put('/api/events/:id/equipment-items', authMW, async (req, res) => {
+  const rows = req.body;
+  await dbRun(`DELETE FROM equipment_items WHERE event_id = ?`, [req.params.id]);
+  for (const it of rows) {
+    const price = it.priceDay !== undefined ? it.priceDay : (it.price || 0);
+    await dbRun(
+      `INSERT INTO equipment_items (event_id, category, name, qty, unit, price, needed, packed, note, source, is_external) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.id, it.category, it.name, it.qty || 1, it.unit || 'Stk', price, it.needed !== false ? 1 : 0, it.packed ? 1 : 0, it.note || '', it.source || 'catalog', it.isExternal ? 1 : 0]
+    );
+  }
+  res.json({ success: true });
+});
+
+// ─── Payments ───────────────────────────────
+app.get('/api/events/:id/payments', authMW, async (req, res) => {
+  const rows = await dbAll(`SELECT * FROM payments WHERE event_id = ?`, [req.params.id]);
+  res.json(rows);
+});
+
+app.put('/api/events/:id/payments', authMW, async (req, res) => {
+  const rows = req.body;
+  await dbRun(`DELETE FROM payments WHERE event_id = ?`, [req.params.id]);
+  for (const p of rows) {
+    await dbRun(
+      `INSERT INTO payments (event_id, type, amount, due_date, status) VALUES (?, ?, ?, ?, ?)`,
+      [req.params.id, p.type, p.amount || 0, p.dueDate, p.status || 'offen']
+    );
+  }
+  res.json({ success: true });
+});
+
+// ─── Event Todos ────────────────────────────
+app.get('/api/events/:id/todos', authMW, async (req, res) => {
+  const rows = await dbAll(`SELECT * FROM event_todos WHERE event_id = ? ORDER BY done, due_date`, [req.params.id]);
+  res.json(rows);
+});
+
+app.put('/api/events/:id/todos', authMW, async (req, res) => {
+  const rows = req.body;
+  await dbRun(`DELETE FROM event_todos WHERE event_id = ?`, [req.params.id]);
+  for (const t of rows) {
+    await dbRun(
+      `INSERT INTO event_todos (event_id, title, due_date, done) VALUES (?, ?, ?, ?)`,
+      [req.params.id, t.title, t.dueDate, t.done ? 1 : 0]
+    );
+  }
+  res.json({ success: true });
+});
+
+// ─── Settings ───────────────────────────────
+app.get('/api/settings', authMW, async (req, res) => {
+  const rows = await dbAll(`SELECT * FROM settings WHERE user_id = ?`, [req.user.id]);
+  res.json(rows);
+});
+
+app.put('/api/settings', authMW, async (req, res) => {
+  const rows = req.body;
+  for (const s of rows) {
+    await dbRun(
+      `INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?, ?, ?)`,
+      [req.user.id, s.key, s.value]
+    );
+  }
   res.json({ success: true });
 });
 
