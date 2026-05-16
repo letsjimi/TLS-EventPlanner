@@ -5,6 +5,26 @@
 
 const db = new Dexie('TLS_EventManager_v3');
 
+db.version(6).stores({
+  events: '++id, userId, orderNumber, status, eventType, date, clientName, totalPrice, orderType',
+  locations: '++id, eventId, sortOrder',
+  contacts: '++id, eventId, role, name',
+  timeline: '++id, eventId, time, sortOrder',
+  equipmentItems: '++id, eventId, category, name, needed',
+  equipmentCatalog: '++id, userId, category, name, tags, isExternal',
+  equipmentPackages: '++id, userId, name, tags',
+  payments: '++id, eventId, type, status',
+  settings: 'userId, key',
+  eventTodos: '++id, eventId, dueDate, done',
+  users: '++id, username',
+  eventPersonnel: '++id, eventId, role'
+}).upgrade(async tx => {
+  const events = await tx.events.toArray();
+  for (const ev of events) {
+    if (!ev.orderType) await tx.events.update(ev.id, { orderType: 'event' });
+  }
+});
+
 db.version(5).stores({
   events: '++id, userId, orderNumber, status, eventType, date, clientName, totalPrice',
   locations: '++id, eventId, sortOrder',
@@ -18,27 +38,9 @@ db.version(5).stores({
   eventTodos: '++id, eventId, dueDate, done',
   users: '++id, username'
 }).upgrade(async tx => {
-  // Migration: Tag-basierte Pakete → Item-basierte Pakete
-  const packages = await tx.equipmentPackages.toArray();
-  const catalog  = await tx.equipmentCatalog.toArray();
-  for (const pkg of packages) {
-    if (pkg.items && Array.isArray(pkg.items)) continue; // bereits migriert
-    const pkgTags = new Set(pkg.tags || []);
-    const items = [];
-    let sortOrder = 1;
-    for (const cat of catalog) {
-      if (cat.tags && cat.tags.some(t => pkgTags.has(t))) {
-        items.push({
-          name: cat.name,
-          qty: 1,
-          group: cat.category || 'Standard',
-          sortOrder: sortOrder++
-        });
-      }
-    }
-    if (items.length > 0) {
-      await tx.equipmentPackages.update(pkg.id, { items });
-    }
+  const events = await tx.events.toArray();
+  for (const ev of events) {
+    if (!ev.orderType) await tx.events.update(ev.id, { orderType: 'event' });
   }
 });
 

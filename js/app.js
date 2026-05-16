@@ -515,6 +515,10 @@ const app = {
     const fields = [
       { name: 'orderNumber', label: 'Auftrags-Nr', placeholder: 'z.B. TLS-2026-004' },
       { name: 'date', label: 'Datum', type: 'date' },
+      { name: 'orderType', label: 'Auftrags-Art', type: 'select', options: [
+        { value: 'event', label: '🎉 Event (mit Service & Personal)' },
+        { value: 'rental', label: '📦 Nur Verleih (Equipment-Miete)' }
+      ]},
       { name: 'eventType', label: 'Event-Typ', type: 'select', options: [
         { value: 'Hochzeit', label: '💒 Hochzeit' },
         { value: 'Firmenfeier', label: '🏢 Firmenfeier' },
@@ -556,12 +560,26 @@ const app = {
       </form>`,
       async () => {
         const data = UI.getFormData(document.getElementById('event-form'));
-        data.createdAt = new Date().toISOString();
+        data.orderType = data.orderType || 'event';
         data.remaining = (data.totalPrice || 0) - (data.deposit || 0);
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
         data.userId = Auth.userId || 1;
         const id = await db.events.add(data);
+        // Default Personnel für Events (außer Verleih)
+        if (data.orderType !== 'rental') {
+          await db.eventPersonnel.bulkAdd([
+            { eventId: id, role: 'Haupttechniker (Sound/Licht)', qty: 1, unit: 'Pauschale', price: 650, needed: true, sortOrder: 1 },
+            { eventId: id, role: 'Hilfskraft (Aufbau/Abbau)', qty: 1, unit: 'Pauschale', price: 200, needed: true, sortOrder: 2 },
+            { eventId: id, role: 'Anfahrt', qty: data.km || 0, unit: 'km', price: 0.70, needed: true, sortOrder: 3 },
+            { eventId: id, role: 'Verpflegung', qty: 2, unit: 'Pers.', price: 25, needed: true, sortOrder: 4 }
+          ]);
+        } else {
+          // Für Verleih: nur Anfahrt, kein Personal
+          await db.eventPersonnel.bulkAdd([
+            { eventId: id, role: 'Anfahrt / Lieferung', qty: data.km || 0, unit: 'km', price: 0.70, needed: true, sortOrder: 1 }
+          ]);
+        }
         UI.toast('Auftrag erstellt: ' + data.orderNumber, 'success');
         this.navigate('#events');
       }
@@ -1433,23 +1451,37 @@ const app = {
       equipmentLines.push({ name: item.name, qty: item.qty, unit: catItem?.unit || 'Stk', price, pricePerDay: catItem?.priceDay || 0 });
     });
 
-    // Personnel (static for now, editable later)
-    const personnel = [
-      { role: 'Haupttechniker (Sound/Licht)', qty: 1, unit: 'Pauschale', price: 650, needed: true },
-      { role: 'Hilfskraft (Aufbau/Abbau)', qty: 1, unit: 'Pauschale', price: 200, needed: true },
-      { role: 'Anfahrt', qty: e.km || 0, unit: 'km', price: 0.70, needed: true },
-      { role: 'Verpflegung', qty: 2, unit: 'Pers.', price: 25, needed: true }
-    ];
-    let personnelTotal = personnel.reduce((s, p) => s + (p.needed ? p.price * p.qty : 0), 0);
+    // Personnel from database (editable)
+    let personnel = await db.eventPersonnel.where('eventId').equals(this.currentEventId).toArray();
+    // Fallback for old events without personnel data
+    if (personnel.length === 0) {
+      if (e.orderType !== 'rental') {
+        personnel = [
+          { eventId: this.currentEventId, role: 'Haupttechniker (Sound/Licht)', qty: 1, unit: 'Pauschale', price: 650, needed: true, sortOrder: 1 },
+          { eventId: this.currentEventId, role: 'Hilfskraft (Aufbau/Abbau)', qty: 1, unit: 'Pauschale', price: 200, needed: true, sortOrder: 2 },
+          { eventId: this.currentEventId, role: 'Anfahrt', qty: e.km || 0, unit: 'km', price: 0.70, needed: true, sortOrder: 3 },
+          { eventId: this.currentEventId, role: 'Verpflegung', qty: 2, unit: 'Pers.', price: 25, needed: true, sortOrder: 4 }
+        ];
+      } else {
+        personnel = [
+          { eventId: this.currentEventId, role: 'Anfahrt / Lieferung', qty: e.km || 0, unit: 'km', price: 0.70, needed: true, sortOrder: 1 }
+        ];
+      }
+      await db.eventPersonnel.bulkAdd(personnel);
+    }
+    const personnelTotal = personnel.reduce((s, p) => s + (p.needed ? p.price * p.qty : 0), 0);
 
     const netTotal = equipmentTotal + personnelTotal;
     const vat = netTotal * 0.19;
     const grossTotal = netTotal + vat;
 
+    // Verleih-Modus Label
+    const orderLabel = e.orderType === 'rental' ? '📦 Verleih' : '🎉 Event';
+
     return `
       <div class="page-header">
         <div>
-          <div style="font-size:0.875rem;color:var(--c-text-3)">${e.orderNumber}</div>
+          <div style="font-size:0.875rem;color:var(--c-text-3)">${e.orderNumber} · ${orderLabel}</div>
           <h1 class="page-title">Kalkulation: ${e.clientName}</h1>
         </div>
         <div style="text-align:right">
@@ -1462,6 +1494,7 @@ const app = {
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#planner/${e.id}')">📍 Planung</button>
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#contacts/${e.id}')">👥 Kontakte</button>
         <button class="btn btn-sm btn-ghost" onclick="app.navigate('#equipment/${e.id}')">🎛️ Equipment</button>
+        ${e.orderType !== 'rental' ? `<button class="btn btn-sm btn-ghost" onclick="app.navigate('#personnel/${e.id}')">👤 Personal</button>` : ''}
         <button class="btn btn-sm btn-secondary" onclick="app.navigate('#calculation/${e.id}')">💰 Kalkulation</button>
       </div>
 
@@ -1489,15 +1522,17 @@ const app = {
 
         <!-- PERSONNEL -->
         <div class="card">
-          <div class="card-header">
-            <div class="card-title">👤 Personal & Service</div>
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="card-title">${e.orderType === 'rental' ? '🚚 Lieferung & Service' : '👤 Personal & Service'}</div>
+            </div>
             <div style="font-weight:700;color:var(--c-accent)">${UI.euro(personnelTotal)}</div>
           </div>
           <table class="data-table" style="font-size:0.8125rem">
             <thead><tr><th>Position</th><th>Anz.</th><th>Einheit</th><th style="text-align:right">Preis</th></tr></thead>
             <tbody>
               ${personnel.map(p => `
-                <tr>
+                <tr style="${!p.needed ? 'opacity:0.45;text-decoration:line-through' : ''}">
                   <td>${p.role}</td>
                   <td>${p.qty}</td>
                   <td>${p.unit}</td>
@@ -1506,6 +1541,7 @@ const app = {
               `).join('')}
             </tbody>
           </table>
+          ${e.orderType !== 'rental' ? `<div style="padding:var(--space-sm);border-top:1px solid var(--c-border)"><button class="btn btn-sm btn-ghost" onclick="app.editPersonnel()"><i data-lucide="pencil" style="width:14px;height:14px"></i> Personal bearbeiten</button></div>` : ''}
         </div>
       </div>
 
