@@ -44,6 +44,14 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
+  const url = new URL(req.url);
+
+  // Cache-Busting-Parameter → IMMER frisch holen
+  if (url.searchParams.has('_v') || url.searchParams.has('_cb') || url.searchParams.has('noCache')) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
   // CDN-Ressourcen: Network → Cache fallback
   if (req.url.includes('unpkg.com')) {
     event.respondWith(
@@ -52,7 +60,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Lokale statische Files: Cache first → Network
+  // Index.html: IMMER Network-First (damit Version-Check funktioniert)
+  if (url.pathname === '/' || url.pathname.endsWith('/index.html')) {
+    event.respondWith(
+      fetch(req).then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+        }
+        return response;
+      }).catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Alle anderen lokale statische Files: Cache first → Network
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
