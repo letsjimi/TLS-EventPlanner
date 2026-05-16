@@ -1339,48 +1339,56 @@ const app = {
     if (!pkg) return;
 
     const catalog = await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray();
+    const catalogMap = new Map(catalog.map(c => [c.name, c]));
     const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();
-    const existingNames = new Set(existing.map(e => e.name));
+    const existingMap = new Map(existing.map(e => [e.name, e]));
 
-    // Finde alle Katalog-Items, deren Tags mit dem Paket übereinstimmen
-    const pkgTags = new Set(pkg.tags);
-    const matches = catalog.filter(item =>
-      item.tags && item.tags.some(tag => pkgTags.has(tag))
-    );
+    let matches = [];
+    // Neue Item-basierte Pakete
+    if (pkg.items && Array.isArray(pkg.items) && pkg.items.length > 0) {
+      for (const it of pkg.items) {
+        const cat = catalogMap.get(it.name);
+        if (cat) matches.push({ ...cat, _pkgQty: it.qty || 1 });
+      }
+    } else {
+      // Legacy: Tag-basiert
+      const pkgTags = new Set(pkg.tags);
+      matches = catalog.filter(item => item.tags && item.tags.some(tag => pkgTags.has(tag)));
+    }
 
     let added = 0;
     for (const item of matches) {
-      if (!existingNames.has(item.name)) {
-        // Bestands-Check
-        let canAdd = true;
-        if (!item.isExternal && item.stock < 999) {
-          const allEv = await db.events.where('userId').equals(Auth.userId || 1).toArray();
-          const evIds = allEv.filter(ev => ev.id !== this.currentEventId).map(ev => ev.id);
-          let used = 0;
-          for (const eid of evIds) {
-            const ei = await db.equipmentItems.where({ eventId: eid, name: item.name }).toArray();
-            used += ei.reduce((s, i) => s + (i.qty || 1), 0);
-          }
-          if (used >= item.stock) {
-            UI.toast(`⚠️ "${item.name}" nicht hinzugefügt – Lager leer (${item.stock}/${item.stock} gebucht)`, 'warning', 4000);
-            canAdd = false;
-          }
+      const qty = item._pkgQty || 1;
+      const existingItem = existingMap.get(item.name);
+      if (existingItem) {
+        // Update qty instead of skipping
+        await db.equipmentItems.update(existingItem.id, { qty: existingItem.qty + qty });
+        added++;
+        continue;
+      }
+      // Bestands-Check
+      let canAdd = true;
+      if (!item.isExternal && item.stock < 999) {
+        const conflict = await this.checkStockConflict(item, qty, this.currentEventId);
+        if (conflict.conflict) {
+          UI.toast(`⚠️ "${item.name}" nicht hinzugefügt – Lager leer (${conflict.available}/${conflict.stock} verfügbar)`, 'warning', 4000);
+          canAdd = false;
         }
-        if (canAdd) {
-          await db.equipmentItems.add({
-            eventId: this.currentEventId,
-            category: item.category,
-            name: item.name,
-            qty: 1,
-            needed: true,
-            packed: false,
-            note: `Paket: ${pkg.name}`,
-            source: 'package',
-            isExternal: !!item.isExternal,
-            priceDay: item.priceDay || 0
-          });
-          added++;
-        }
+      }
+      if (canAdd) {
+        await db.equipmentItems.add({
+          eventId: this.currentEventId,
+          category: item.category,
+          name: item.name,
+          qty: qty,
+          needed: true,
+          packed: false,
+          note: `Paket: ${pkg.name}`,
+          source: 'package',
+          isExternal: !!item.isExternal,
+          priceDay: item.priceDay || 0
+        });
+        added++;
       }
     }
 
@@ -1985,6 +1993,9 @@ const app = {
     const ownCount = catalog.filter(c => !c.isExternal).length;
     const extCount = catalog.filter(c => c.isExternal).length;
 
+    // Kategorie-Filter-Chips
+    const allCats = [...new Set(catalog.map(c => c.category))].sort();
+
     return `
       <div class="page-header">
         <div><h1 class="page-title">📦 Katalog-Verwaltung</h1></div>
@@ -1994,6 +2005,15 @@ const app = {
       <div style="display:flex;gap:var(--space-md);margin-bottom:var(--space-md);flex-wrap:wrap">
         <span class="badge badge-success">${ownCount} eigene Geräte</span>
         <span class="badge badge-warning">${extCount} externe Miete</span>
+      </div>
+
+      <!-- Kategorie-Filter -->
+      <div style="display:flex;gap:6px;margin-bottom:var(--space-md);flex-wrap:wrap;align-items:center">
+        <span style="font-size:0.8125rem;color:var(--c-text-3);font-weight:600">Filter:</span>
+        <button class="badge" style="cursor:pointer;background:var(--c-accent);color:#fff;border:none;font-size:0.75rem" onclick="app._catFilter='';app.navigate('#catalog')">Alle</button>
+        ${allCats.map(cat => `
+          <button class="badge" style="cursor:pointer;background:var(--c-surface);color:var(--c-text);border:1px solid var(--c-border);font-size:0.75rem" onclick="app._catFilter='${cat}';app.navigate('#catalog')">${cat}</button>
+        `).join('')}
       </div>
 
       <!-- Geräte-Tabelle -->
@@ -2011,7 +2031,7 @@ const app = {
               <th style="width:80px"></th>
             </tr></thead>
             <tbody>
-              ${catalog.map(item => `
+              ${catalog.filter(c => !app._catFilter || c.category === app._catFilter).map(item => `
                 <tr>
                   <td><span style="color:var(--c-text-3);font-size:0.8125rem">${item.category}</span></td>
                   <td><strong>${item.name}</strong></td>
@@ -2045,14 +2065,15 @@ const app = {
       </div>
       <div class="grid-2">
         ${packages.map(pkg => `
-          <div class="card">
+          <div class="card" style="cursor:pointer" onclick="app.editPackage(${pkg.id})" title="Paket bearbeiten">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-sm)">
               <div>
                 <div style="font-weight:700">${pkg.name}</div>
                 <div style="font-size:0.8125rem;color:var(--c-text-3);margin-top:2px">${pkg.description || ''}</div>
+                <div style="font-size:0.75rem;color:var(--c-text-3);margin-top:4px">${(pkg.items || []).length} Geräte · ${[...new Set((pkg.items || []).map(i => i.group))].join(', ') || 'Keine Gruppen'}</div>
               </div>
               <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:45%">
-                ${pkg.tags.map(t => `<span class="badge" style="font-size:0.65rem">${t}</span>`).join(' ')}
+                ${(pkg.tags || []).map(t => `<span class="badge" style="font-size:0.65rem">${t}</span>`).join(' ')}
               </div>
             </div>
           </div>
@@ -2060,6 +2081,8 @@ const app = {
       </div>
     `;
   },
+  _catFilter: '',
+  _pickerCatFilter: '',
 
   async addCatalogItem() {
     const fields = [
@@ -2111,17 +2134,141 @@ const app = {
   async addPackageTemplate() {
     const fields = [
       { name: 'name', label: 'Paket-Name', placeholder: 'z.B. Band-Komplett' },
-      { name: 'description', label: 'Beschreibung', placeholder: 'Kurzbeschreibung' },
-      { name: 'tags', label: 'Tags (kommasepariert)', placeholder: 'PA, Top, Sub, Mikro, DI' }
+      { name: 'description', label: 'Beschreibung', placeholder: 'Kurzbeschreibung' }
     ];
     UI.openModal('Neues Paket erstellen', `<form id="pkg-form">${UI.form(fields)}</form>`, async () => {
       const d = UI.getFormData(document.getElementById('pkg-form'));
-      d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      d.tags = [];
+      d.items = [];
       d.userId = Auth.userId || 1;
       await db.equipmentPackages.add(d);
       UI.toast('Paket erstellt', 'success');
       this.openCatalogEditor();
     });
+  },
+
+  /* ── Paket-Editor (Inline) ── */
+  async editPackage(pkgId) {
+    const pkg = await db.equipmentPackages.get(pkgId);
+    if (!pkg) return;
+    const catalog = await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray();
+    const catalogMap = new Map(catalog.map(c => [c.name, c]));
+
+    // Ensure items array exists
+    let items = pkg.items || [];
+    // Fallback for legacy tag-based packages: build items from tags
+    if (items.length === 0 && (pkg.tags || []).length > 0) {
+      const pkgTags = new Set(pkg.tags);
+      let sortOrder = 1;
+      for (const cat of catalog) {
+        if (cat.tags && cat.tags.some(t => pkgTags.has(t))) {
+          items.push({ name: cat.name, qty: 1, group: cat.category || 'Standard', sortOrder: sortOrder++ });
+        }
+      }
+    }
+
+    const refresh = () => {
+      const tbody = document.getElementById('pkg-edit-items');
+      if (!tbody) return;
+      // Group by group name, then sort by sortOrder
+      const grouped = {};
+      items.forEach(it => {
+        const g = it.group || 'Standard';
+        if (!grouped[g]) grouped[g] = [];
+        grouped[g].push(it);
+      });
+      Object.values(grouped).forEach(arr => arr.sort((a,b) => (a.sortOrder||0) - (b.sortOrder||0)));
+
+      tbody.innerHTML = Object.entries(grouped).map(([groupName, arr]) => `
+        <tr style="background:var(--c-surface-light)">
+          <td colspan="6" style="font-weight:700;font-size:0.875rem;padding:6px 12px">${groupName}</td>
+        </tr>
+        ${arr.map((it, idxInGroup) => `
+          <tr>
+            <td>${it.name}</td>
+            <td>
+              <div class="qty-control" style="display:inline-flex;align-items:center;gap:2px;background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-md);overflow:hidden">
+                <button type="button" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;font-size:1rem;color:var(--c-accent)" onclick="app._pkgInc(${items.indexOf(it)},-1)">−</button>
+                <input type="number" value="${it.qty || 1}" style="width:40px;text-align:center;border:none;background:none;font-size:0.875rem" onchange="app._pkgSetQty(${items.indexOf(it)},this.value)">
+                <button type="button" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;font-size:1rem;color:var(--c-accent)" onclick="app._pkgInc(${items.indexOf(it)},1)">+</button>
+              </div>
+            </td>
+            <td><input type="text" value="${it.group || 'Standard'}" style="width:120px;font-size:0.8125rem;padding:4px 6px;border:1px solid var(--c-border);border-radius:var(--radius-sm);background:var(--c-bg)" onchange="app._pkgSetGroup(${items.indexOf(it)},this.value)"></td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-icon btn-ghost" onclick="app._pkgMove(${items.indexOf(it)},-1)" title="Nach oben">▲</button>
+              <button class="btn btn-icon btn-ghost" onclick="app._pkgMove(${items.indexOf(it)},1)" title="Nach unten">▼</button>
+            </td>
+            <td>
+              <button class="btn btn-icon btn-ghost" style="color:var(--c-danger)" onclick="app._pkgRemove(${items.indexOf(it)})" title="Entfernen">✕</button>
+            </td>
+          </tr>
+        `).join('')}
+      `).join('');
+    };
+
+    // Bind helpers onto app so inline onclick works
+    app._pkgInc = (i, delta) => { items[i].qty = Math.max(1, (items[i].qty || 1) + delta); refresh(); };
+    app._pkgSetQty = (i, v) => { items[i].qty = Math.max(1, parseInt(v) || 1); refresh(); };
+    app._pkgSetGroup = (i, v) => { items[i].group = v.trim() || 'Standard'; refresh(); };
+    app._pkgMove = (i, dir) => {
+      if (dir === -1 && i > 0) [items[i-1], items[i]] = [items[i], items[i-1]];
+      if (dir === 1 && i < items.length-1) [items[i], items[i+1]] = [items[i+1], items[i]];
+      refresh();
+    };
+    app._pkgRemove = (i) => { items.splice(i, 1); refresh(); };
+    app._pkgAddItem = (itemName) => {
+      const cat = catalogMap.get(itemName);
+      items.push({ name: itemName, qty: 1, group: cat ? cat.category : 'Standard', sortOrder: items.length + 1 });
+      refresh();
+    };
+
+    const unusedCatalog = catalog.filter(c => !items.some(it => it.name === c.name));
+
+    UI.openModal('Paket bearbeiten: ' + pkg.name, `
+      <div style="max-height:70vh;overflow-y:auto;padding-right:4px">
+        <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-md);flex-wrap:wrap">
+          <input id="pkg-edit-name" value="${pkg.name}" placeholder="Paketname" style="flex:1;min-width:150px;font-size:0.9375rem;padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-md);background:var(--c-bg)">
+          <input id="pkg-edit-desc" value="${pkg.description || ''}" placeholder="Beschreibung" style="flex:2;min-width:200px;font-size:0.9375rem;padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-md);background:var(--c-bg)">
+        </div>
+
+        <!-- Hinzufügen -->
+        <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-md);align-items:center">
+          <select id="pkg-add-select" style="flex:1;padding:6px 10px;border:1px solid var(--c-border);border-radius:var(--radius-md);background:var(--c-bg);font-size:0.875rem">
+            <option value="" disabled selected>Gerät hinzufügen...</option>
+            ${unusedCatalog.map(c => `<option value="${c.name}">${c.category} — ${c.name}</option>`).join('')}
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="const s=document.getElementById('pkg-add-select');if(s.value){app._pkgAddItem(s.value);s.value='';}">Hinzufügen</button>
+        </div>
+
+        <!-- Items-Tabelle -->
+        <table class="data-table" style="width:100%;margin-bottom:var(--space-md)">
+          <thead>
+            <tr><th>Gerät</th><th style="width:90px">Menge</th><th>Gruppe</th><th style="width:80px">Reihe</th><th style="width:50px"></th></tr>
+          </thead>
+          <tbody id="pkg-edit-items"></tbody>
+        </table>
+
+        ${items.length === 0 ? '<p style="color:var(--c-text-3);text-align:center">Noch keine Geräte im Paket.</p>' : ''}
+      </div>
+    `, async () => {
+      const name = document.getElementById('pkg-edit-name').value.trim();
+      const desc = document.getElementById('pkg-edit-desc').value.trim();
+      if (!name) { UI.toast('Name erforderlich', 'error'); return false; }
+      await db.equipmentPackages.update(pkgId, {
+        name, description: desc, items,
+        tags: [...new Set(items.map(i => i.group).filter(Boolean))]
+      });
+      UI.toast('Paket gespeichert', 'success');
+      delete app._pkgInc; delete app._pkgSetQty; delete app._pkgSetGroup;
+      delete app._pkgMove; delete app._pkgRemove; delete app._pkgAddItem;
+      this.openCatalogEditor();
+    }, () => {
+      delete app._pkgInc; delete app._pkgSetQty; delete app._pkgSetGroup;
+      delete app._pkgMove; delete app._pkgRemove; delete app._pkgAddItem;
+    });
+
+    // Render initial list
+    setTimeout(refresh, 50);
   },
 
   async deleteCatalogItem(id) {
@@ -2149,8 +2296,21 @@ const app = {
       byCat[item.category].push(item);
     });
 
+    // Kategorie-Filter-Chips
+    const allCats = Object.keys(byCat).sort();
+    const filter = app._pickerCatFilter || '';
+    const catsToShow = filter ? [filter] : allCats;
+
     const html = `
       <div style="max-height:65vh;overflow-y:auto;padding-right:4px">
+        <!-- Kategorie-Filter -->
+        <div style="display:flex;gap:6px;margin-bottom:var(--space-md);flex-wrap:wrap;align-items:center;position:sticky;top:0;background:var(--c-bg);z-index:1;padding-bottom:4px">
+          <span style="font-size:0.8125rem;color:var(--c-text-3);font-weight:600">Filter:</span>
+          <button class="badge" style="cursor:pointer;background:${!filter?'var(--c-accent);color:#fff':'var(--c-surface);color:var(--c-text);border:1px solid var(--c-border)'};border:none;font-size:0.75rem" onclick="app._pickerCatFilter='';app.openCatalogPicker()">Alle</button>
+          ${allCats.map(cat => `
+            <button class="badge" style="cursor:pointer;background:${filter===cat?'var(--c-accent);color:#fff':'var(--c-surface);color:var(--c-text);border:1px solid var(--c-border)'};border:none;font-size:0.75rem" onclick="app._pickerCatFilter='${cat}';app.openCatalogPicker()">${cat}</button>
+          `).join('')}
+        </div>
         <style>
           .cat-picker-item {
             display: flex; align-items: center; gap: var(--space-sm);
@@ -2213,7 +2373,7 @@ const app = {
           .add-big-btn .lucide { width: 22px; height: 22px; }
         </style>
 
-        ${Object.keys(byCat).sort().map(cat => `
+        ${catsToShow.map(cat => `
           <div style="margin-bottom:var(--space-md)">
             <h4 style="font-size:0.8125rem;color:var(--c-text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600">${cat}</h4>
             ${byCat[cat].map(item => {

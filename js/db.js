@@ -5,6 +5,43 @@
 
 const db = new Dexie('TLS_EventManager_v3');
 
+db.version(5).stores({
+  events: '++id, userId, orderNumber, status, eventType, date, clientName, totalPrice',
+  locations: '++id, eventId, sortOrder',
+  contacts: '++id, eventId, role, name',
+  timeline: '++id, eventId, time, sortOrder',
+  equipmentItems: '++id, eventId, category, name, needed',
+  equipmentCatalog: '++id, userId, category, name, tags, isExternal',
+  equipmentPackages: '++id, userId, name, tags',
+  payments: '++id, eventId, type, status',
+  settings: 'userId, key',
+  eventTodos: '++id, eventId, dueDate, done',
+  users: '++id, username'
+}).upgrade(async tx => {
+  // Migration: Tag-basierte Pakete → Item-basierte Pakete
+  const packages = await tx.equipmentPackages.toArray();
+  const catalog  = await tx.equipmentCatalog.toArray();
+  for (const pkg of packages) {
+    if (pkg.items && Array.isArray(pkg.items)) continue; // bereits migriert
+    const pkgTags = new Set(pkg.tags || []);
+    const items = [];
+    let sortOrder = 1;
+    for (const cat of catalog) {
+      if (cat.tags && cat.tags.some(t => pkgTags.has(t))) {
+        items.push({
+          name: cat.name,
+          qty: 1,
+          group: cat.category || 'Standard',
+          sortOrder: sortOrder++
+        });
+      }
+    }
+    if (items.length > 0) {
+      await tx.equipmentPackages.update(pkg.id, { items });
+    }
+  }
+});
+
 db.version(4).stores({
   events: '++id, userId, orderNumber, status, eventType, date, clientName, totalPrice',
   locations: '++id, eventId, sortOrder',
