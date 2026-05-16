@@ -73,8 +73,24 @@ const API = {
       const rows = await db.events.where('synced').equals(0).toArray();
       for (const r of rows) {
         try {
-          await API.events.create(r);
-          await db.events.update(r.id, { synced: 1 });
+          const body = { ...r };
+          delete body.id;        // let server assign PK
+          delete body.synced;    // local-only flag
+          delete body.userId;    // server uses token
+          const res = await API.events.create(body);
+          const oldId = r.id;
+          const newId = res.id;
+          // Migrate local event to server id
+          await db.events.delete(oldId);
+          await db.events.put({ ...r, id: newId, synced: 1 });
+          // Cascade update related tables
+          await db.locations.where('eventId').equals(oldId).modify(l => { l.eventId = newId; });
+          await db.contacts.where('eventId').equals(oldId).modify(c => { c.eventId = newId; });
+          await db.timeline.where('eventId').equals(oldId).modify(t => { t.eventId = newId; });
+          await db.equipmentItems.where('eventId').equals(oldId).modify(i => { i.eventId = newId; });
+          await db.payments.where('eventId').equals(oldId).modify(p => { p.eventId = newId; });
+          await db.eventTodos.where('eventId').equals(oldId).modify(t => { t.eventId = newId; });
+          await db.eventPersonnel.where('eventId').equals(oldId).modify(p => { p.eventId = newId; });
         } catch (e) { console.warn('Sync event failed', e); }
       }
     },
@@ -102,6 +118,8 @@ const API = {
           notes: r.notes,
           km: r.km,
           duration: r.duration || 1,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
           synced: 1
         };
         if (!local) await db.events.add(obj);

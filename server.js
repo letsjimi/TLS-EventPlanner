@@ -294,10 +294,23 @@ app.put('/api/events/:id', authMW, async (req, res) => {
   const d = req.body;
   const event = await dbGet(`SELECT * FROM events WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id]);
   if (!event) return res.status(404).json({ error: 'Not found' });
+  const orderNumber = d.orderNumber !== undefined ? d.orderNumber : event.order_number;
+  const orderType   = d.orderType   !== undefined ? d.orderType   : event.order_type;
+  const status      = d.status      !== undefined ? d.status      : event.status;
+  const eventType   = d.eventType   !== undefined ? d.eventType   : event.event_type;
+  const date        = d.date        !== undefined ? d.date        : event.date;
+  const clientName  = d.clientName  !== undefined ? d.clientName  : event.client_name;
+  const locations   = d.locations   !== undefined ? d.locations   : event.locations;
+  const totalPrice  = d.totalPrice  !== undefined ? d.totalPrice  : event.total_price;
+  const deposit     = d.deposit     !== undefined ? d.deposit     : event.deposit;
+  const remaining   = d.remaining   !== undefined ? d.remaining   : (totalPrice - deposit);
+  const notes       = d.notes       !== undefined ? d.notes       : event.notes;
+  const km          = d.km          !== undefined ? d.km          : event.km;
+  const duration    = d.duration    !== undefined ? d.duration    : event.duration;
   await dbRun(
     `UPDATE events SET order_number=?, order_type=?, status=?, event_type=?, date=?, client_name=?, locations=?, total_price=?, deposit=?, remaining=?, notes=?, km=?, duration=?, updated_at=CURRENT_TIMESTAMP
      WHERE id = ?`,
-    [d.orderNumber, d.orderType, d.status, d.eventType, d.date, d.clientName, d.locations, d.totalPrice, d.deposit, d.remaining, d.notes, d.km, d.duration||1, req.params.id]
+    [orderNumber, orderType, status, eventType, date, clientName, locations, totalPrice, deposit, remaining, notes, km, duration||1, req.params.id]
   );
   res.json({ success: true });
 });

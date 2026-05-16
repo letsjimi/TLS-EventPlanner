@@ -3032,7 +3032,21 @@ const app = {
       data.duration = 1;
       data.km = 0;
       data.synced = API.token ? 0 : 1;
-      const id = await db.events.add(data);
+      let id;
+      if (API.token) {
+        try {
+          const res = await API.events.create(data);
+          id = res.id;
+          data.id = id;
+          await db.events.add(data);
+        } catch(e) {
+          console.warn('API create quick event failed, falling back to local:', e.message);
+          id = await db.events.add(data);
+        }
+      } else {
+        id = await db.events.add(data);
+      }
+      data.id = id;
       UI.toast('Auftrag erstellt', 'success');
       this.navigate('#planner/' + id);
     });
