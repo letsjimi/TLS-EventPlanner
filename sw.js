@@ -3,7 +3,7 @@
  * Cache-first für statische Assets, Dexie/IndexedDB bleibt unangetastet
  */
 
-const CACHE_NAME = 'tls-eventmanager-v3';
+const CACHE_NAME = 'tls-eventmanager-v4';
 const STATIC_FILES = [
   '/',
   '/index.html',

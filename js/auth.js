@@ -61,9 +61,6 @@ const Auth = {
           </button>
           <div id="login-error" class="login-error" style="display:none"></div>
         </form>
-        <div class="login-hint">
-          Standard-Passwort: <code>TLS-Event-2026!</code>
-        </div>
       </div>
     `;
 
