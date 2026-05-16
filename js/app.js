@@ -84,6 +84,7 @@ const app = {
       contacts:  () => this.renderContacts(subPage),
       equipment: () => this.renderEquipment(subPage),
       catalog:   () => this.openCatalogEditorFromNav(),
+      personnel: () => this.renderPersonnel(subPage),
       calculation: () => this.renderCalculation(subPage),
       market:    () => this.renderMarket(),
       calendar:  () => {
@@ -1928,6 +1929,138 @@ const app = {
       }
     };
     input.click();
+  },
+
+  // ═══════════════════════════════════════════════
+  // PERSONNEL EDITOR
+  // ═══════════════════════════════════════════════
+  async renderPersonnel(eventId) {
+    if (!eventId) {
+      const events = await db.events.where('userId').equals(Auth.userId || 1).toArray();
+      return `
+        <div class="page-header"><h1 class="page-title">👤 Personal</h1></div>
+        <p class="text-muted mb-2">Wähle einen Auftrag:</p>
+        <div class="grid-2">${events.map(e => `
+          <div class="card" style="cursor:pointer" onclick="app.navigate('#personnel/${e.id}')">
+            <div style="font-weight:700">${e.clientName}</div>
+            <div class="text-muted" style="font-size:0.875rem">${e.orderNumber} · ${UI.formatDate(e.date)}</div>
+          </div>
+        `).join('')}</div>`;
+    }
+    this.currentEventId = parseInt(eventId);
+    const e = await db.events.get(this.currentEventId);
+    if (!e) return '<div class="page-header"><h1>Auftrag nicht gefunden</h1></div>';
+    const personnel = await db.eventPersonnel.where('eventId').equals(this.currentEventId).sortBy('sortOrder');
+    const total = personnel.reduce((s, p) => s + (p.needed ? p.price * p.qty : 0), 0);
+
+    return `
+      <div class="page-header">
+        <div>
+          <div style="font-size:0.875rem;color:var(--c-text-3)">${e.orderNumber}</div>
+          <h1 class="page-title">👤 Personal: ${e.clientName}</h1>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:1.25rem;font-weight:700;color:var(--c-accent)">${UI.euro(total)}</div>
+          <button class="btn btn-primary" onclick="app.editPersonnel()"><i data-lucide="pencil" style="width:14px;height:14px"></i> Bearbeiten</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        ${personnel.map(p => `
+          <div class="card" style="${!p.needed ? 'opacity:0.45' : ''}">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:700;${!p.needed ? 'text-decoration:line-through' : ''}">${p.role}</div>
+              ${!p.needed ? '<span class="badge" style="font-size:0.7rem;background:var(--c-text-3)">gestrichen</span>' : ''}
+            </div>
+            <div style="font-size:0.8125rem;color:var(--c-text-3);margin-top:4px">
+              ${p.qty} ${p.unit} × ${UI.euro(p.price)} = <strong>${UI.euro(p.price * p.qty)}</strong>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      ${personnel.length === 0 ? `<div class="text-muted" style="text-align:center;padding:var(--space-2xl)">
+        Keine Personal-Positionen. Klicke „Bearbeiten“ um Standard-Personal hinzuzufügen.
+      </div>` : ''}
+    `;
+  },
+
+  async editPersonnel() {
+    const personnel = await db.eventPersonnel.where('eventId').equals(this.currentEventId).sortBy('sortOrder');
+    const e = await db.events.get(this.currentEventId);
+    if (!e) return;
+
+    const refresh = () => {
+      const tbody = document.getElementById('personnel-edit-body');
+      if (!tbody) return;
+      tbody.innerHTML = personnel.map((p, i) => `
+        <tr style="${!p.needed ? 'opacity:0.45' : ''}">
+          <td><input type="text" value="${p.role}" style="width:100%;font-size:0.875rem;padding:4px 6px;border:1px solid var(--c-border);border-radius:var(--radius-sm);background:var(--c-bg)" onchange="app._persSetRole(${i},this.value)"></td>
+          <td>
+            <div class="qty-control" style="display:inline-flex;align-items:center;gap:2px;background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-md);overflow:hidden">
+              <button type="button" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;font-size:1rem;color:var(--c-accent)" onclick="app._persInc(${i},-1)">−</button>
+              <input type="number" value="${p.qty || 1}" style="width:40px;text-align:center;border:none;background:none;font-size:0.875rem" onchange="app._persSetQty(${i},this.value)">
+              <button type="button" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;font-size:1rem;color:var(--c-accent)" onclick="app._persInc(${i},1)">+</button>
+            </div>
+          </td>
+          <td><input type="text" value="${p.unit}" style="width:70px;font-size:0.8125rem;padding:4px 6px;border:1px solid var(--c-border);border-radius:var(--radius-sm);background:var(--c-bg)" onchange="app._persSetUnit(${i},this.value)"></td>
+          <td><input type="number" value="${p.price || 0}" step="0.01" style="width:80px;font-size:0.875rem;padding:4px 6px;border:1px solid var(--c-border);border-radius:var(--radius-sm);background:var(--c-bg)" onchange="app._persSetPrice(${i},this.value)"></td>
+          <td style="text-align:center">
+            <button class="btn btn-icon btn-ghost" onclick="app._persToggle(${i})" title="${p.needed ? 'Nicht benötigt' : 'Benötigt'}">${p.needed ? '✅' : '⬜'}</button>
+          </td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-icon btn-ghost" onclick="app._persMove(${i},-1)">▲</button>
+            <button class="btn btn-icon btn-ghost" onclick="app._persMove(${i},1)">▼</button>
+            <button class="btn btn-icon btn-ghost" style="color:var(--c-danger)" onclick="app._persRemove(${i})">✕</button>
+          </td>
+        </tr>
+      `).join('');
+    };
+
+    app._persInc = (i, d) => { personnel[i].qty = Math.max(1, (personnel[i].qty || 1) + d); refresh(); };
+    app._persSetQty = (i, v) => { personnel[i].qty = Math.max(1, parseInt(v) || 1); refresh(); };
+    app._persSetRole = (i, v) => { personnel[i].role = v.trim() || 'Neue Position'; refresh(); };
+    app._persSetUnit = (i, v) => { personnel[i].unit = v.trim() || 'Stk'; refresh(); };
+    app._persSetPrice = (i, v) => { personnel[i].price = parseFloat(v) || 0; refresh(); };
+    app._persToggle = (i) => { personnel[i].needed = !personnel[i].needed; refresh(); };
+    app._persMove = (i, d) => {
+      if (d === -1 && i > 0) [personnel[i-1], personnel[i]] = [personnel[i], personnel[i-1]];
+      if (d === 1 && i < personnel.length-1) [personnel[i], personnel[i+1]] = [personnel[i+1], personnel[i]];
+      refresh();
+    };
+    app._persRemove = (i) => { personnel.splice(i, 1); refresh(); };
+    app._persAdd = () => {
+      personnel.push({ eventId: this.currentEventId, role: 'Neue Position', qty: 1, unit: 'Pauschale', price: 0, needed: true, sortOrder: personnel.length + 1 });
+      refresh();
+    };
+
+    UI.openModal('Personal bearbeiten: ' + e.clientName, `
+      <div style="max-height:65vh;overflow-y:auto">
+        <button class="btn btn-sm btn-primary" onclick="app._persAdd()" style="margin-bottom:var(--space-md)">+ Neue Position</button>
+        <table class="data-table" style="font-size:0.8125rem;width:100%">
+          <thead><tr><th>Position</th><th style="width:90px">Menge</th><th style="width:80px">Einheit</th><th style="width:90px">€/Stk</th><th style="width:70px">Aktiv</th><th style="width:120px"></th></tr></thead>
+          <tbody id="personnel-edit-body"></tbody>
+        </table>
+      </div>
+    `, async () => {
+      // Delete old and add new
+      await db.eventPersonnel.where('eventId').equals(this.currentEventId).delete();
+      if (personnel.length > 0) {
+        for (let i = 0; i < personnel.length; i++) {
+          personnel[i].sortOrder = i + 1;
+          personnel[i].eventId = this.currentEventId;
+        }
+        await db.eventPersonnel.bulkAdd(personnel);
+      }
+      UI.toast('Personal gespeichert', 'success');
+      delete app._persInc; delete app._persSetQty; delete app._persSetRole; delete app._persSetUnit;
+      delete app._persSetPrice; delete app._persToggle; delete app._persMove; delete app._persRemove; delete app._persAdd;
+      this.navigate(`#personnel/${this.currentEventId}`);
+    }, () => {
+      delete app._persInc; delete app._persSetQty; delete app._persSetRole; delete app._persSetUnit;
+      delete app._persSetPrice; delete app._persToggle; delete app._persMove; delete app._persRemove; delete app._persAdd;
+    });
+    setTimeout(refresh, 50);
   },
 
   // ═══════════════════════════════════════════════
