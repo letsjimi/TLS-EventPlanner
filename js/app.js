@@ -2578,7 +2578,7 @@ const app = {
   async deleteCatalogItem(id) {
     const item = await db.equipmentCatalog.get(id);
     if (!item) return;
-    UI.confirm(`Gerät "${item.name}" aus dem Katalog löschen?\\n\\nDas entfernt es nicht aus bestehenden Events, nur aus dem Katalog.`, async () => {
+    UI.confirm(`Gerät "${item.name}" aus dem Katalog löschen?\n\nDas entfernt es nicht aus bestehenden Events, nur aus dem Katalog.`, async () => {
       await db.equipmentCatalog.delete(id);
       if (API.token) { try { await API.catalog.remove(id); } catch(e) { console.warn('API catalog delete failed:', e.message); } }
       UI.toast('Gerät aus Katalog entfernt', 'info');
