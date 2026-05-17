@@ -39,7 +39,25 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 // ─── Middleware ──────────────────────────────
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Security: block access to sensitive paths
+app.use((req, res, next) => {
+  const blocked = /^\/(?:\.git|\.env|data(?:\/|$)|node_modules(?:\/|$)|server\.js|package.*\.json|\.hermes)/;
+  if (blocked.test(req.path)) return res.status(403).json({ error: 'Forbidden' });
+  next();
+});
+
 app.use(express.static(__dirname));
+
+// ─── Health ──────────────────────────────────
+app.get('/api/health', async (req, res) => {
+  try {
+    await dbGet(`SELECT 1`);
+    res.json({ status: 'ok', db: 'connected' });
+  } catch (e) {
+    res.status(503).json({ status: 'error', db: e.message });
+  }
+});
 
 // ─── Auth Middleware ─────────────────────────
 function authMW(req, res, next) {

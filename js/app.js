@@ -2826,7 +2826,10 @@ const app = {
     }
     await db.events.update(id, data);
     UI.toast(`Status: ${statusLabel[status]}`, 'success');
-    this.navigate(`#planner/${id}`);
+    // Auf Mobile nach Kanban-Kontextmenü nicht immer zum Planner springen
+    const hash = location.hash;
+    if (hash.includes('dashboard')) this.navigate('#dashboard');
+    else this.navigate(`#planner/${id}`);
   },
 
   // ═══════════════════════════════════════════════
