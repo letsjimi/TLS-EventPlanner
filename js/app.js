@@ -898,6 +898,7 @@ const app = {
       data.sortOrder = existing + 1;
       await db.locations.add(data);
       UI.toast('Location hinzugefügt', 'success');
+      this._syncTable('locations', 'locations', this.currentEventId);
       this.navigate(`#planner/${this.currentEventId}`);
     });
   },
@@ -917,6 +918,7 @@ const app = {
     UI.openModal('Location bearbeiten', `<form id="edit-loc-form">${UI.form(fields, l)}</form>`, async () => {
       const data = UI.getFormData(document.getElementById('edit-loc-form'));
       await db.locations.update(id, data);
+      this._syncTable('locations', 'locations', this.currentEventId);
       UI.toast('Location aktualisiert', 'success');
       this.navigate(`#planner/${this.currentEventId}`);
     });
@@ -925,6 +927,7 @@ const app = {
   async deleteLocation(id) {
     UI.confirm('Location wirklich löschen?', async () => {
       await db.locations.delete(id);
+      this._syncTable('locations', 'locations', this.currentEventId);
       UI.toast('Location gelöscht', 'info');
       this.navigate(`#planner/${this.currentEventId}`);
     });
@@ -950,6 +953,7 @@ const app = {
       data.sortOrder = existing + 1;
       await db.timeline.add(data);
       UI.toast('Position hinzugefügt', 'success');
+      this._syncTable('timeline', 'timeline', this.currentEventId);
       this.navigate(`#planner/${this.currentEventId}`);
     });
   },
@@ -967,6 +971,7 @@ const app = {
     UI.openModal('Position bearbeiten', `<form id="edit-tl-form">${UI.form(fields, t)}</form>`, async () => {
       const data = UI.getFormData(document.getElementById('edit-tl-form'));
       await db.timeline.update(id, data);
+      this._syncTable('timeline', 'timeline', this.currentEventId);
       UI.toast('Aktualisiert', 'success');
       this.navigate(`#planner/${this.currentEventId}`);
     });
@@ -976,6 +981,7 @@ const app = {
     const scrollY = window.scrollY;
     const t = await db.timeline.get(id);
     await db.timeline.update(id, { done: !t.done });
+    this._syncTable('timeline', 'timeline', this.currentEventId);
     this.navigate(`#planner/${this.currentEventId}`);
     requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
   },
@@ -984,6 +990,7 @@ const app = {
     const scrollY = window.scrollY;
     UI.confirm('Position löschen?', async () => {
       await db.timeline.delete(id);
+      this._syncTable('timeline', 'timeline', this.currentEventId);
       UI.toast('Gelöscht', 'info');
       this.navigate(`#planner/${this.currentEventId}`);
       requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
@@ -1081,6 +1088,7 @@ const app = {
       data.eventId = this.currentEventId;
       await db.contacts.add(data);
       UI.toast('Kontakt hinzugefügt', 'success');
+      this._syncTable('contacts', 'contacts', this.currentEventId);
       this.navigate(`#contacts/${this.currentEventId}`);
     });
   },
@@ -1099,6 +1107,7 @@ const app = {
     UI.openModal('Kontakt bearbeiten', `<form id="edit-contact-form">${UI.form(fields, c)}</form>`, async () => {
       const data = UI.getFormData(document.getElementById('edit-contact-form'));
       await db.contacts.update(id, data);
+      this._syncTable('contacts', 'contacts', this.currentEventId);
       UI.toast('Kontakt aktualisiert', 'success');
       this.navigate(`#contacts/${this.currentEventId}`);
     });
@@ -1107,6 +1116,7 @@ const app = {
   async deleteContact(id) {
     UI.confirm('Kontakt löschen?', async () => {
       await db.contacts.delete(id);
+      this._syncTable('contacts', 'contacts', this.currentEventId);
       UI.toast('Kontakt gelöscht', 'info');
       this.navigate(`#contacts/${this.currentEventId}`);
     });
@@ -1256,6 +1266,7 @@ const app = {
   async toggleEquipmentNeeded(id, checked) {
     const savedY = window.scrollY;
     await db.equipmentItems.update(id, { needed: checked, packed: checked ? false : false });
+    this._syncTable('equipmentItems', 'equipment', this.currentEventId);
     const btn = document.querySelector(`input[onchange*="toggleEquipmentNeeded(${id},"]`);
     if (!btn) { this._restoreScroll(savedY); return; }
     const row = btn.closest('.checklist-item');
@@ -1289,6 +1300,7 @@ const app = {
   async toggleEquipmentPacked(id, checked) {
     const savedY = window.scrollY;
     await db.equipmentItems.update(id, { packed: checked });
+    this._syncTable('equipmentItems', 'equipment', this.currentEventId);
     const cb = document.querySelector(`input[id="eq-${id}"]`);
     if (cb) {
       cb.checked = checked;
@@ -1315,6 +1327,7 @@ const app = {
     const scrollY = window.scrollY;
     UI.confirm('Equipment-Position löschen?', async () => {
       await db.equipmentItems.delete(id);
+      this._syncTable('equipmentItems', 'equipment', this.currentEventId);
       UI.toast('Gelöscht', 'info');
       // Lösche die DOM-Zeile direkt statt full re-render
       const row = document.querySelector(`button[onclick*="deleteEquipmentItem(${id}"]`).closest('.checklist-item');
@@ -1359,6 +1372,7 @@ const app = {
     `, async () => {
       const newQty = parseInt(document.getElementById('qty-value').value, 10) || 1;
       await db.equipmentItems.update(id, { qty: newQty });
+      this._syncTable('equipmentItems', 'equipment', this.currentEventId);
       // DOM live updaten statt Re-Render
       const row = document.querySelector(`button[onclick*="editEquipmentQty(${id}"]`).closest('.checklist-item');
       if (row) {
@@ -1401,6 +1415,7 @@ const app = {
       data.packed = false;
       data.source = 'manual';
       await db.equipmentItems.add(data);
+      this._syncTable('equipmentItems', 'equipment', this.currentEventId);
       UI.toast('Hinzugefügt', 'success');
       this.navigate(`#equipment/${this.currentEventId}`);
     });
@@ -1464,6 +1479,8 @@ const app = {
         added++;
       }
     }
+
+    if (added > 0 && API.token) { try { await API.equipment.save(this.currentEventId, await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray()); } catch(e) { console.warn('API equipment sync failed:', e.message); } }
 
     UI.toast(`${added} Positionen aus "${pkg.name}" hinzugefügt`, 'success');
     this.navigate(`#equipment/${this.currentEventId}`);
@@ -2379,7 +2396,12 @@ const app = {
       d.tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean);
       d.isExternal = !!d.isExternal;
       d.userId = Auth.userId || 1;
-      await db.equipmentCatalog.add(d);
+      d.synced = API.token ? 0 : 1;
+      const localId = await db.equipmentCatalog.add(d);
+      if (API.token) {
+        try { const res = await API.catalog.create(d); await db.equipmentCatalog.update(localId, { id: res.id, synced: 1 }); }
+        catch(e) { console.warn('API catalog create failed:', e.message); }
+      }
       UI.toast('Gerät hinzugefügt', 'success');
       this.openCatalogEditor();
     });
@@ -2404,6 +2426,10 @@ const app = {
       d.isExternal = !!d.isExternal;
       d.userId = Auth.userId || 1;
       await db.equipmentCatalog.update(id, d);
+      if (API.token) {
+        try { await API.catalog.update(id, d); }
+        catch(e) { console.warn('API catalog update failed:', e.message); }
+      }
       UI.toast('Gerät aktualisiert', 'success');
       this.openCatalogEditor();
     });
@@ -2552,8 +2578,9 @@ const app = {
   async deleteCatalogItem(id) {
     const item = await db.equipmentCatalog.get(id);
     if (!item) return;
-    UI.confirm(`Gerät "${item.name}" aus dem Katalog löschen?\n\nDas entfernt es nicht aus bestehenden Events, nur aus dem Katalog.`, async () => {
+    UI.confirm(`Gerät "${item.name}" aus dem Katalog löschen?\\n\\nDas entfernt es nicht aus bestehenden Events, nur aus dem Katalog.`, async () => {
       await db.equipmentCatalog.delete(id);
+      if (API.token) { try { await API.catalog.remove(id); } catch(e) { console.warn('API catalog delete failed:', e.message); } }
       UI.toast('Gerät aus Katalog entfernt', 'info');
       this.navigate('#catalog');
     });
@@ -2741,17 +2768,11 @@ const app = {
     }
 
     await db.equipmentItems.add({
-      eventId: this.currentEventId,
-      category: item.category,
-      name: item.name,
-      qty: qty,
-      needed: true,
-      packed: false,
-      note: '',
-      source: 'catalog',
-      isExternal: !!item.isExternal,
-      priceDay: item.priceDay || 0
+      eventId: this.currentEventId, category: item.category, name: item.name,
+      qty, needed: true, packed: false, note: '', source: 'catalog',
+      isExternal: !!item.isExternal, priceDay: item.priceDay || 0
     });
+    this._syncTable('equipmentItems', 'equipment', this.currentEventId);
     UI.toast(`${item.name} × ${qty} hinzugefügt`, 'success');
     this.openCatalogPicker();
   },
@@ -2824,6 +2845,7 @@ const app = {
         dueDate: data.dueDate || '',
         done: false
       });
+      this._syncTable('eventTodos', 'todos', this.currentEventId);
       UI.toast('TODO hinzugefügt', 'success');
       this.navigate(`#planner/${this.currentEventId}`);
     });
@@ -2834,6 +2856,7 @@ const app = {
     const t = await db.eventTodos.get(id);
     if (!t) return;
     await db.eventTodos.update(id, { done: !t.done });
+    this._syncTable('eventTodos', 'todos', this.currentEventId);
     this.navigate(`#planner/${this.currentEventId}`);
     requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
   },
@@ -2842,6 +2865,7 @@ const app = {
     const scrollY = window.scrollY;
     UI.confirm('TODO löschen?', async () => {
       await db.eventTodos.delete(id);
+      this._syncTable('eventTodos', 'todos', this.currentEventId);
       UI.toast('TODO gelöscht', 'info');
       this.navigate(`#planner/${this.currentEventId}`);
       requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
