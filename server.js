@@ -595,13 +595,14 @@ app.post('/api/import/full', authMW, async (req, res) => {
       const mapped = eventIdMap[oldId];
       return mapped !== undefined ? mapped : oldId;
     }
+    function evId(obj) { return obj.eventId !== undefined ? obj.eventId : obj.event_id; }
 
     if (data.locations) {
       for (const l of data.locations) {
         await dbRun(
           `INSERT INTO locations (event_id, name, address, km, setup_time, soundcheck, notes, contact_name, contact_phone, sort_order)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [mapEventId(l.eventId), l.name, l.address, l.km || 0, l.setupTime, l.soundcheck, l.notes, l.contactName, l.contactPhone, l.sortOrder || 0]
+          [mapEventId(evId(l)), l.name, l.address, l.km || 0, l.setupTime !== undefined ? l.setupTime : l.setup_time, l.soundcheck, l.notes, l.contactName !== undefined ? l.contactName : l.contact_name, l.contactPhone !== undefined ? l.contactPhone : l.contact_phone, l.sortOrder !== undefined ? l.sortOrder : (l.sort_order || 0)]
         );
       }
     }
@@ -610,7 +611,7 @@ app.post('/api/import/full', authMW, async (req, res) => {
         await dbRun(
           `INSERT INTO contacts (event_id, role, name, phone, email, responsibility, notes, availability)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [mapEventId(c.eventId), c.role, c.name, c.phone, c.email, c.responsibility, c.notes, c.availability]
+          [mapEventId(evId(c)), c.role, c.name, c.phone, c.email, c.responsibility, c.notes, c.availability]
         );
       }
     }
@@ -619,25 +620,27 @@ app.post('/api/import/full', authMW, async (req, res) => {
         await dbRun(
           `INSERT INTO timeline (event_id, time, title, detail, location, duration, crew, done, sort_order)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [mapEventId(t.eventId), t.time, t.title, t.detail, t.location, t.duration, t.crew, t.done ? 1 : 0, t.sortOrder || 0]
+          [mapEventId(evId(t)), t.time, t.title, t.detail, t.location, t.duration, t.crew, t.done ? 1 : 0, t.sortOrder !== undefined ? t.sortOrder : (t.sort_order || 0)]
         );
       }
     }
     if (data.equipmentItems) {
       for (const it of data.equipmentItems) {
-        const price = it.priceDay !== undefined ? it.priceDay : (it.price || 0);
+        const price = it.priceDay !== undefined ? it.priceDay : (it.price !== undefined ? it.price : 0);
+        const isExt = it.isExternal !== undefined ? it.isExternal : it.is_external;
         await dbRun(
           `INSERT INTO equipment_items (event_id, category, name, qty, unit, price, needed, packed, note, source, is_external)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [mapEventId(it.eventId), it.category, it.name, it.qty || 1, it.unit || 'Stk', price, it.needed !== false ? 1 : 0, it.packed ? 1 : 0, it.note || '', it.source || 'catalog', it.isExternal ? 1 : 0]
+          [mapEventId(evId(it)), it.category, it.name, it.qty || 1, it.unit || 'Stk', price, it.needed !== false ? 1 : 0, it.packed ? 1 : 0, it.note || '', it.source || 'catalog', isExt ? 1 : 0]
         );
       }
     }
     if (data.equipmentCatalog) {
       for (const c of data.equipmentCatalog) {
+        const isExt = c.isExternal !== undefined ? c.isExternal : c.is_external;
         await dbRun(
           `INSERT INTO equipment_catalog (user_id, category, name, tags, unit, price_day, stock, is_external) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uid, c.category, c.name, c.tags, c.unit, c.priceDay, c.stock, c.isExternal ? 1 : 0]
+          [uid, c.category, c.name, c.tags, c.unit, c.priceDay !== undefined ? c.priceDay : c.price_day, c.stock, isExt ? 1 : 0]
         );
       }
     }
@@ -653,7 +656,7 @@ app.post('/api/import/full', authMW, async (req, res) => {
       for (const p of data.payments) {
         await dbRun(
           `INSERT INTO payments (event_id, type, amount, due_date, status) VALUES (?, ?, ?, ?, ?)`,
-          [mapEventId(p.eventId), p.type, p.amount || 0, p.dueDate, p.status || 'offen']
+          [mapEventId(evId(p)), p.type, p.amount || 0, p.dueDate !== undefined ? p.dueDate : p.due_date, p.status || 'offen']
         );
       }
     }

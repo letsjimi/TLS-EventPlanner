@@ -17,7 +17,11 @@ const API = {
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(this.base + path, opts);
     if (res.status === 401) { this.token = null; localStorage.removeItem('jwt'); throw new Error('Unauthorized'); }
-    if (!res.ok) throw new Error((await res.json()).error || res.statusText);
+    if (!res.ok) {
+      let msg = res.statusText;
+      try { const body = await res.json(); msg = body.error || msg; } catch { /* ignore non-JSON error body */ }
+      throw new Error(msg);
+    }
     return res.status === 204 ? null : await res.json();
   },
 
@@ -111,7 +115,8 @@ const API = {
           const newId = res.id;
           // Migrate local event to server id
           await db.events.delete(oldId);
-          await db.events.put({ ...r, id: newId, synced: 1 });
+          const updated = { ...r, id: newId, synced: 1 };
+          await db.events.put(updated);
           // Cascade update related tables
           await db.locations.where('eventId').equals(oldId).modify(l => { l.eventId = newId; });
           await db.contacts.where('eventId').equals(oldId).modify(c => { c.eventId = newId; });
@@ -120,6 +125,16 @@ const API = {
           await db.payments.where('eventId').equals(oldId).modify(p => { p.eventId = newId; });
           await db.eventTodos.where('eventId').equals(oldId).modify(t => { t.eventId = newId; });
           await db.eventPersonnel.where('eventId').equals(oldId).modify(p => { p.eventId = newId; });
+          // Also push nested data so server has full record
+          try {
+            await API.locations.save(newId, await db.locations.where('eventId').equals(newId).toArray());
+            await API.contacts.save(newId, await db.contacts.where('eventId').equals(newId).toArray());
+            await API.timeline.save(newId, await db.timeline.where('eventId').equals(newId).toArray());
+            await API.equipment.save(newId, await db.equipmentItems.where('eventId').equals(newId).toArray());
+            await API.payments.save(newId, await db.payments.where('eventId').equals(newId).toArray());
+            await API.todos.save(newId, await db.eventTodos.where('eventId').equals(newId).toArray());
+            await API.personnel.save(newId, await db.eventPersonnel.where('eventId').equals(newId).toArray());
+          } catch(e) { console.warn('Sync nested data failed', e); }
         } catch (e) { console.warn('Sync event failed', e); }
       }
     },
@@ -170,7 +185,7 @@ const API = {
           API.todos.list(eventId),
           API.personnel.list(eventId)
         ]);
-        if (locations) {
+        if (locations && locations.length > 0) {
           await db.locations.where('eventId').equals(eventId).delete();
           await db.locations.bulkAdd((locations || []).map(l => ({
             eventId: l.event_id, name: l.name, address: l.address, km: l.km,
@@ -178,21 +193,21 @@ const API = {
             contactName: l.contact_name, contactPhone: l.contact_phone, sortOrder: l.sort_order
           })));
         }
-        if (contacts) {
+        if (contacts && contacts.length > 0) {
           await db.contacts.where('eventId').equals(eventId).delete();
           await db.contacts.bulkAdd((contacts || []).map(c => ({
             eventId: c.event_id, role: c.role, name: c.name, phone: c.phone,
             email: c.email, responsibility: c.responsibility, notes: c.notes, availability: c.availability
           })));
         }
-        if (timeline) {
+        if (timeline && timeline.length > 0) {
           await db.timeline.where('eventId').equals(eventId).delete();
           await db.timeline.bulkAdd((timeline || []).map(t => ({
             eventId: t.event_id, time: t.time, title: t.title, detail: t.detail,
             location: t.location, duration: t.duration, crew: t.crew, done: !!t.done, sortOrder: t.sort_order
           })));
         }
-        if (equipmentItems) {
+        if (equipmentItems && equipmentItems.length > 0) {
           await db.equipmentItems.where('eventId').equals(eventId).delete();
           await db.equipmentItems.bulkAdd((equipmentItems || []).map(it => ({
             eventId: it.event_id, category: it.category, name: it.name, qty: it.qty, unit: it.unit,
@@ -200,19 +215,19 @@ const API = {
             note: it.note || '', source: it.source || 'catalog', isExternal: !!it.is_external
           })));
         }
-        if (payments) {
+        if (payments && payments.length > 0) {
           await db.payments.where('eventId').equals(eventId).delete();
           await db.payments.bulkAdd((payments || []).map(p => ({
             eventId: p.event_id, type: p.type, amount: p.amount, dueDate: p.due_date, status: p.status
           })));
         }
-        if (eventTodos) {
+        if (eventTodos && eventTodos.length > 0) {
           await db.eventTodos.where('eventId').equals(eventId).delete();
           await db.eventTodos.bulkAdd((eventTodos || []).map(t => ({
             eventId: t.event_id, title: t.title, dueDate: t.due_date, done: !!t.done
           })));
         }
-        if (eventPersonnel) {
+        if (eventPersonnel && eventPersonnel.length > 0) {
           await db.eventPersonnel.where('eventId').equals(eventId).delete();
           await db.eventPersonnel.bulkAdd((eventPersonnel || []).map(p => ({
             eventId: p.event_id, role: p.role, qty: p.qty, unit: p.unit,

@@ -106,6 +106,7 @@ db.version(1).stores({
    ═══════════════════════════════════════════════ */
 
 async function seedDatabase() {
+  if (typeof API !== 'undefined' && API.token) return; // avoid local seed duplicating server data
   const uid = Auth.userId || 1;
   if (uid !== 1) return; // Seed-Daten nur für den ersten Account (Timon)
 

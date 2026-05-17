@@ -574,6 +574,7 @@ const app = {
             const res = await API.events.create(data);
             id = res.id;
             data.id = id;
+            data.synced = 1; // mark synced immediately so pushAll doesn't duplicate
             await db.events.add(data);
           } catch(e) {
             console.warn('API create failed, falling back to local:', e.message);
@@ -1951,6 +1952,21 @@ const app = {
       const text = await file.text();
       try {
         const data = JSON.parse(text);
+
+        // If online and logged in, push to server first
+        if (API.token) {
+          try {
+            await API.import.full(data);
+            // After server import, pull events back to local DB via sync
+            await API.sync.pullEvents();
+            UI.toast('Daten auf Server importiert', 'success');
+            this.navigate('#dashboard');
+            return;
+          } catch (serverErr) {
+            console.warn('Server import failed, falling back to local:', serverErr.message);
+          }
+        }
+
         // Delete only current user's data
         const userEvents = await db.events.where('userId').equals(uid).toArray();
         const userEventIds = userEvents.map(ev => ev.id);
@@ -3038,6 +3054,7 @@ const app = {
           const res = await API.events.create(data);
           id = res.id;
           data.id = id;
+          data.synced = 1;
           await db.events.add(data);
         } catch(e) {
           console.warn('API create quick event failed, falling back to local:', e.message);
