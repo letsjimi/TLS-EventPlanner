@@ -239,6 +239,24 @@ async function initSchema() {
 initSchema().catch(err => console.error('Schema init error:', err));
 
 // ─── Auth ────────────────────────────────────
+app.post('/api/auth/change-password', authMW, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'Invalid input' });
+    }
+    const user = await dbGet(`SELECT * FROM users WHERE id = ?`, [req.user.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const match = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!match) return res.status(401).json({ error: 'Current password incorrect' });
+    const hash = await bcrypt.hash(newPassword, 10);
+    await dbRun(`UPDATE users SET password_hash = ? WHERE id = ?`, [hash, req.user.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -269,6 +287,11 @@ app.post('/api/auth/register', async (req, res) => {
 app.get('/api/auth/me', authMW, async (req, res) => {
   const user = await dbGet(`SELECT id, username, display_name, is_admin FROM users WHERE id = ?`, [req.user.id]);
   res.json({ ...user, displayName: user.display_name, isAdmin: !!user.is_admin });
+});
+
+app.get('/api/auth/users', authMW, adminMW, async (req, res) => {
+  const rows = await dbAll(`SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY id`);
+  res.json(rows.map(u => ({ id: u.id, username: u.username, displayName: u.display_name, isAdmin: !!u.is_admin, createdAt: u.created_at })));
 });
 
 // ─── CRUD Events ────────────────────────────
@@ -313,6 +336,12 @@ app.put('/api/events/:id', authMW, async (req, res) => {
     [orderNumber, orderType, status, eventType, date, clientName, locations, totalPrice, deposit, remaining, notes, km, duration||1, req.params.id]
   );
   res.json({ success: true });
+});
+
+app.get('/api/events/:id', authMW, async (req, res) => {
+  const row = await dbGet(`SELECT * FROM events WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id]);
+  if (!row) return res.status(404).json({ error: 'Not found' });
+  res.json(row);
 });
 
 app.delete('/api/events/:id', authMW, async (req, res) => {
@@ -531,7 +560,7 @@ app.delete('/api/equipment-packages/:id', authMW, async (req, res) => {
 // ─── Export CSV ──────────────────────────────
 app.get('/api/export/events.csv', authMW, async (req, res) => {
   const rows = await dbAll(`SELECT * FROM events WHERE user_id = ?`, [req.user.id]);
-  const headers = ['id', 'order_number', 'order_type', 'status', 'event_type', 'date', 'client_name', 'locations', 'total_price', 'deposit', 'remaining', 'notes', 'km'];
+  const headers = ['id', 'order_number', 'order_type', 'status', 'event_type', 'date', 'client_name', 'locations', 'total_price', 'deposit', 'remaining', 'notes', 'km', 'duration'];
   const lines = [headers.join(';')];
   rows.forEach(r => {
     lines.push(headers.map(h => (r[h] ?? '').toString().replace(/"/g, '""')).join(';'));

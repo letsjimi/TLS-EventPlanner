@@ -34,10 +34,13 @@ const API = {
     login: (u, p)    => API.post('/api/auth/login', { username: u, password: p }),
     register: (u, p, dn) => API.post('/api/auth/register', { username: u, password: p, displayName: dn }),
     me: ()           => API.get('/api/auth/me'),
+    changePassword: (current, newPw) => API.post('/api/auth/change-password', { currentPassword: current, newPassword: newPw }),
+    users: ()        => API.get('/api/auth/users'),
   },
 
   events: {
     list: ()         => API.get('/api/events'),
+    get: (id)        => API.get('/api/events/' + id),
     create: (d)      => API.post('/api/events', d),
     update: (id, d)  => API.put('/api/events/' + id, d),
     remove: (id)     => API.del('/api/events/' + id),

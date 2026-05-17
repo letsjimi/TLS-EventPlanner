@@ -174,11 +174,6 @@ const Auth = {
       const confirm = document.getElementById('pw-confirm').value;
       const errEl = document.getElementById('pw-error');
 
-      if (current !== this.currentUser.password) {
-        errEl.textContent = 'Aktuelles Passwort ist falsch.';
-        errEl.style.display = 'block';
-        throw new Error('wrong_current');
-      }
       if (newPw !== confirm) {
         errEl.textContent = 'Passwörter stimmen nicht überein.';
         errEl.style.display = 'block';
@@ -190,7 +185,36 @@ const Auth = {
         throw new Error('too_short');
       }
 
-      await db.users.update(this.currentUser.id, { password: newPw });
+      // Zuerst API-Change versuchen wenn online
+      if (API.token && this.currentUser && this.currentUser.id) {
+        try {
+          await API.auth.changePassword(current, newPw);
+          UI.toast('Passwort erfolgreich geändert!', 'success');
+          // Auch lokal aktualisieren falls vorhanden
+          const localUser = await db.users.where('username').equals(this.currentUser.username).first();
+          if (localUser) {
+            await db.users.update(localUser.id, { password: newPw });
+          }
+          return;
+        } catch (apiErr) {
+          if (apiErr.message && (apiErr.message.includes('incorrect') || apiErr.message.includes('Invalid') || apiErr.message.includes('401'))) {
+            errEl.textContent = 'Aktuelles Passwort ist falsch.';
+            errEl.style.display = 'block';
+            throw new Error('wrong_current');
+          }
+          // API nicht erreichbar → Fallback lokal
+          console.warn('API password change failed, falling back to local:', apiErr.message);
+        }
+      }
+
+      // Lokales Passwort ändern (Offline-Mode)
+      const localUser = await db.users.where('username').equals(this.currentUser.username).first();
+      if (!localUser || localUser.password !== current) {
+        errEl.textContent = 'Aktuelles Passwort ist falsch.';
+        errEl.style.display = 'block';
+        throw new Error('wrong_current');
+      }
+      await db.users.update(localUser.id, { password: newPw });
       this.currentUser.password = newPw;
       UI.toast('Passwort erfolgreich geändert!', 'success');
     }, 'Passwort ändern');
