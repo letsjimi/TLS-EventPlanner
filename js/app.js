@@ -563,8 +563,8 @@ const app = {
       async () => {
         const data = UI.getFormData(document.getElementById('event-form'));
         data.orderType = data.orderType || 'event';
-        const total = data.totalPrice !== undefined ? data.totalPrice : e.totalPrice;
-        const dep = data.deposit !== undefined ? data.deposit : e.deposit;
+        const total = parseFloat(data.totalPrice) || 0;
+        const dep = parseFloat(data.deposit) || 0;
         data.remaining = total - dep;
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
