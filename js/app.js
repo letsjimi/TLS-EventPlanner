@@ -534,6 +534,7 @@ const app = {
       { name: 'totalPrice', label: 'Gesamtpreis (€)', type: 'number', step: '0.01' },
       { name: 'deposit', label: 'Anzahlung (€)', type: 'number', step: '0.01' },
       { name: 'km', label: 'Kilometer (km)', type: 'number', step: '1' },
+      { name: 'duration', label: 'Dauer (Tage)', type: 'number', step: '1' },
       { name: 'status', label: 'Status', type: 'select', options: [
         { value: 'inquiry', label: 'Anfrage' },
         { value: 'offer', label: 'Angebot' },
@@ -552,7 +553,7 @@ const app = {
           ${UI.form(fields.slice(0, 2), { orderNumber: nextNum })}
         </div>
         <div class="form-row">
-          ${UI.form(fields.slice(2, 4))}
+          ${UI.form(fields.slice(2,4))}
         </div>
         ${UI.form([fields[4]])}
         <div class="form-row">
@@ -643,6 +644,7 @@ const app = {
       { name: 'totalPrice', label: 'Gesamtpreis', type: 'number', step: '0.01' },
       { name: 'deposit', label: 'Anzahlung', type: 'number', step: '0.01' },
       { name: 'km', label: 'Kilometer', type: 'number', step: '1' },
+      { name: 'duration', label: 'Dauer (Tage)', type: 'number', step: '1' },
       { name: 'status', label: 'Status', type: 'select', options: [
         { value: 'inquiry', label: 'Anfrage' },
         { value: 'offer', label: 'Angebot' },

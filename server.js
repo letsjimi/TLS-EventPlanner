@@ -746,17 +746,19 @@ app.post('/api/import/full', authMW, async (req, res) => {
     if (data.equipmentCatalog) {
       for (const c of data.equipmentCatalog) {
         const isExt = c.isExternal !== undefined ? c.isExternal : c.is_external;
+        const tagsStr = Array.isArray(c.tags) ? JSON.stringify(c.tags) : (c.tags || '');
         await dbRun(
           `INSERT INTO equipment_catalog (user_id, category, name, tags, unit, price_day, stock, is_external) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uid, c.category, c.name, c.tags, c.unit, c.priceDay !== undefined ? c.priceDay : c.price_day, c.stock, isExt ? 1 : 0]
+          [uid, c.category, c.name, tagsStr, c.unit, c.priceDay !== undefined ? c.priceDay : c.price_day, c.stock, isExt ? 1 : 0]
         );
       }
     }
     if (data.equipmentPackages) {
       for (const p of data.equipmentPackages) {
+        const tagsStr = Array.isArray(p.tags) ? JSON.stringify(p.tags) : (p.tags || '');
         await dbRun(
           `INSERT INTO equipment_packages (user_id, name, description, tags, items) VALUES (?, ?, ?, ?, ?)`,
-          [uid, p.name, p.description || '', p.tags, JSON.stringify(p.items || [])]
+          [uid, p.name, p.description || '', tagsStr, JSON.stringify(p.items || [])]
         );
       }
     }
