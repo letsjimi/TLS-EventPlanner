@@ -664,8 +664,8 @@ const app = {
       </form>`,
       async () => {
         const data = UI.getFormData(document.getElementById('edit-form'));
-        const total = data.totalPrice !== undefined ? data.totalPrice : e.totalPrice;
-        const dep = data.deposit !== undefined ? data.deposit : e.deposit;
+        const total = parseFloat(data.totalPrice) || 0;
+        const dep = parseFloat(data.deposit) || 0;
         data.remaining = total - dep;
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
@@ -3048,12 +3048,12 @@ const app = {
       data.date = dateStr;
       data.userId = Auth.userId || 1;
       data.orderType = 'event';
-      data.remaining = (data.totalPrice || 0) - (data.deposit || 0);
-      data.deposit = data.deposit || 0;
+      const total = parseFloat(data.totalPrice) || 0;
+      const dep = parseFloat(data.deposit) || 0;
+      data.remaining = total - dep;
+      data.deposit = dep;
       data.duration = 1;
       data.km = 0;
-      data.deposit = data.deposit || 0;
-      data.remaining = data.totalPrice - data.deposit;
       data.synced = API.token ? 0 : 1;
       let id;
       if (API.token) {

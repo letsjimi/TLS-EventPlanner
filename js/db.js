@@ -14,7 +14,7 @@ db.version(7).stores({
   equipmentCatalog: '++id, userId, category, name, tags, isExternal, synced',
   equipmentPackages: '++id, userId, name, tags',
   payments: '++id, eventId, type, status',
-  settings: '[userId+key]',
+  settings: '[userId+key], userId',
   eventTodos: '++id, eventId, dueDate, done',
   users: '++id, username',
   eventPersonnel: '++id, eventId, role'
