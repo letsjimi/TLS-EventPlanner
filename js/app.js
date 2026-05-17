@@ -2360,7 +2360,12 @@ const app = {
       </div>
       <div class="grid-2">
         ${packages.map(pkg => `
-          <div class="card" style="cursor:pointer" onclick="app.editPackage(${pkg.id})" title="Paket bearbeiten">
+          <div class="card" style="cursor:pointer;position:relative" onclick="app.editPackage(${pkg.id})" title="Paket bearbeiten">
+            <div style="position:absolute;top:6px;right:6px;z-index:1">
+              <button class="btn btn-icon btn-ghost" style="padding:2px" onclick="event.stopPropagation();app.deletePackage(${pkg.id})" title="Paket löschen">
+                <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+              </button>
+            </div>
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-sm)">
               <div>
                 <div style="font-weight:700">${pkg.name}</div>
@@ -2445,7 +2450,11 @@ const app = {
       d.tags = [];
       d.items = [];
       d.userId = Auth.userId || 1;
-      await db.equipmentPackages.add(d);
+      const localId = await db.equipmentPackages.add(d);
+      if (API.token) {
+        try { const res = await API.packages.create(d); await db.equipmentPackages.update(localId, { id: res.id }); }
+        catch(e) { console.warn('API package create failed:', e.message); }
+      }
       UI.toast('Paket erstellt', 'success');
       this.openCatalogEditor();
     });
@@ -2558,10 +2567,11 @@ const app = {
       const name = document.getElementById('pkg-edit-name').value.trim();
       const desc = document.getElementById('pkg-edit-desc').value.trim();
       if (!name) { UI.toast('Name erforderlich', 'error'); return false; }
-      await db.equipmentPackages.update(pkgId, {
-        name, description: desc, items,
-        tags: [...new Set(items.map(i => i.group).filter(Boolean))]
-      });
+      const updatePayload = { name, description: desc, items, tags: [...new Set(items.map(i => i.group).filter(Boolean))] };
+      await db.equipmentPackages.update(pkgId, updatePayload);
+      if (API.token) {
+        try { await API.packages.update(pkgId, updatePayload); } catch(e) { console.warn('API package update failed:', e.message); }
+      }
       UI.toast('Paket gespeichert', 'success');
       delete app._pkgInc; delete app._pkgSetQty; delete app._pkgSetGroup;
       delete app._pkgMove; delete app._pkgRemove; delete app._pkgAddItem;
@@ -2589,6 +2599,20 @@ const app = {
   // ═══════════════════════════════════════════════
   // KATALOG-PICKER (mit Mengenauswahl)
   // ═══════════════════════════════════════════════
+
+  async deletePackage(pkgId) {
+    const pkg = await db.equipmentPackages.get(pkgId);
+    if (!pkg) return;
+    UI.confirm('Paket "' + pkg.name + '" wirklich löschen?', async () => {
+      await db.equipmentPackages.delete(pkgId);
+      if (API.token) {
+        try { await API.packages.remove(pkgId); } catch(e) { console.warn('API package delete failed:', e.message); }
+      }
+      UI.toast('Paket gelöscht', 'info');
+      this.navigate('#catalog');
+    });
+  },
+
   async openCatalogPicker() {
     const catalog = await db.equipmentCatalog.where('userId').equals(Auth.userId || 1).toArray();
     const existing = await db.equipmentItems.where('eventId').equals(this.currentEventId).toArray();

@@ -3,8 +3,8 @@
  * Kein STRG+F5 mehr nötig.
  */
 (function() {
-  const CHECK_EVERY = 10000;   // Sekunden (wie oft nach Updates suchen)
-  const BOOT_DELAY  = 3000;    // Erst-Check nach Seitenladen (ServiceWorker brauch Sekunden)
+  const CHECK_EVERY = 10000;   // Millisekunden (10 Sekunden – wie oft nach Updates suchen)
+  const BOOT_DELAY  = 3000;    // Millisekunden (erst-Check nach Seitenladen, damit SW sich registriert)
   const STORAGE_KEY = '__tls_app_version__';
 
   let current = sessionStorage.getItem(STORAGE_KEY) || '';

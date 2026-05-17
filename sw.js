@@ -48,6 +48,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
 
+  // API-Calls niemals im Asset-Cache puffern
+  if (url.pathname.startsWith('/api/')) return;
+
   // Cache-Busting-Parameter → IMMER frisch holen
   if (url.searchParams.has('_v') || url.searchParams.has('_cb') || url.searchParams.has('noCache')) {
     event.respondWith(fetch(req));
@@ -77,15 +80,16 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Alle anderen lokale statische Files: Cache first → Network
+  const cacheKey = (url.origin === self.location.origin) ? new Request(url.pathname) : req;
   event.respondWith(
-    caches.match(req).then((cached) => {
+    caches.match(cacheKey).then((cached) => {
       if (cached) return cached;
       return fetch(req).then((response) => {
         if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
         const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+        caches.open(CACHE_NAME).then((cache) => cache.put(cacheKey, clone));
         return response;
       });
     })
