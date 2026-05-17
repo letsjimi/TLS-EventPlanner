@@ -522,22 +522,30 @@ app.put('/api/events/:id/personnel', authMW, async (req, res) => {
 // ─── Equipment Catalog ────────────────────────
 app.get('/api/equipment-catalog', authMW, async (req, res) => {
   const rows = await dbAll(`SELECT * FROM equipment_catalog WHERE user_id = ?`, [req.user.id]);
+  rows.forEach(r => {
+    if (typeof r.tags === 'string') {
+      try { r.tags = JSON.parse(r.tags); } catch { r.tags = r.tags.split(',').map(t => t.trim()).filter(Boolean); }
+    }
+    if (!Array.isArray(r.tags)) r.tags = [];
+  });
   res.json(rows);
 });
 
 app.post('/api/equipment-catalog', authMW, async (req, res) => {
   const d = req.body;
+  const tagsStr = Array.isArray(d.tags) ? JSON.stringify(d.tags) : (d.tags || '');
   const result = await dbRun(
     `INSERT INTO equipment_catalog (user_id, category, name, tags, unit, price_day, stock, is_external) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [req.user.id, d.category, d.name, d.tags, d.unit, d.priceDay, d.stock, d.isExternal ? 1 : 0]
+    [req.user.id, d.category, d.name, tagsStr, d.unit, d.priceDay, d.stock, d.isExternal ? 1 : 0]
   );
   res.json({ id: result.lastID });
 });
 
 app.put('/api/equipment-catalog/:id', authMW, async (req, res) => {
   const d = req.body;
+  const tagsStr = Array.isArray(d.tags) ? JSON.stringify(d.tags) : (d.tags || '');
   await dbRun(`UPDATE equipment_catalog SET category=?, name=?, tags=?, unit=?, price_day=?, stock=?, is_external=? WHERE id = ? AND user_id = ?`,
-    [d.category, d.name, d.tags, d.unit, d.priceDay, d.stock, d.isExternal ? 1 : 0, req.params.id, req.user.id]);
+    [d.category, d.name, tagsStr, d.unit, d.priceDay, d.stock, d.isExternal ? 1 : 0, req.params.id, req.user.id]);
   res.json({ success: true });
 });
 
@@ -549,23 +557,31 @@ app.delete('/api/equipment-catalog/:id', authMW, async (req, res) => {
 // ─── Equipment Packages ──────────────────────
 app.get('/api/equipment-packages', authMW, async (req, res) => {
   const rows = await dbAll(`SELECT * FROM equipment_packages WHERE user_id = ?`, [req.user.id]);
-  rows.forEach(r => { try { r.items = JSON.parse(r.items || '[]'); } catch { r.items = []; } });
+  rows.forEach(r => {
+    try { r.items = JSON.parse(r.items || '[]'); } catch { r.items = []; }
+    if (typeof r.tags === 'string') {
+      try { r.tags = JSON.parse(r.tags); } catch { r.tags = r.tags.split(',').map(t => t.trim()).filter(Boolean); }
+    }
+    if (!Array.isArray(r.tags)) r.tags = [];
+  });
   res.json(rows);
 });
 
 app.post('/api/equipment-packages', authMW, async (req, res) => {
   const d = req.body;
+  const tagsStr = Array.isArray(d.tags) ? JSON.stringify(d.tags) : (d.tags || '');
   const result = await dbRun(
     `INSERT INTO equipment_packages (user_id, name, description, tags, items) VALUES (?, ?, ?, ?, ?)`,
-    [req.user.id, d.name, d.description || '', d.tags, JSON.stringify(d.items || [])]
+    [req.user.id, d.name, d.description || '', tagsStr, JSON.stringify(d.items || [])]
   );
   res.json({ id: result.lastID });
 });
 
 app.put('/api/equipment-packages/:id', authMW, async (req, res) => {
   const d = req.body;
+  const tagsStr = Array.isArray(d.tags) ? JSON.stringify(d.tags) : (d.tags || '');
   await dbRun(`UPDATE equipment_packages SET name=?, description=?, tags=?, items=? WHERE id = ? AND user_id = ?`,
-    [d.name, d.description || '', d.tags, JSON.stringify(d.items || []), req.params.id, req.user.id]);
+    [d.name, d.description || '', tagsStr, JSON.stringify(d.items || []), req.params.id, req.user.id]);
   res.json({ success: true });
 });
 
@@ -598,6 +614,19 @@ app.get('/api/export/full', authMW, async (req, res) => {
   data.equipmentItems = await dbAll(`SELECT ei.* FROM equipment_items ei JOIN events e ON ei.event_id = e.id WHERE e.user_id = ?`, [uid]);
   data.equipmentCatalog = await dbAll(`SELECT * FROM equipment_catalog WHERE user_id = ?`, [uid]);
   data.equipmentPackages = await dbAll(`SELECT * FROM equipment_packages WHERE user_id = ?`, [uid]);
+  data.equipmentCatalog.forEach(r => {
+    if (typeof r.tags === 'string') {
+      try { r.tags = JSON.parse(r.tags); } catch { r.tags = r.tags.split(',').map(t => t.trim()).filter(Boolean); }
+    }
+    if (!Array.isArray(r.tags)) r.tags = [];
+  });
+  data.equipmentPackages.forEach(r => {
+    try { r.items = JSON.parse(r.items || '[]'); } catch { r.items = []; }
+    if (typeof r.tags === 'string') {
+      try { r.tags = JSON.parse(r.tags); } catch { r.tags = r.tags.split(',').map(t => t.trim()).filter(Boolean); }
+    }
+    if (!Array.isArray(r.tags)) r.tags = [];
+  });
   data.payments = await dbAll(`SELECT p.* FROM payments p JOIN events e ON p.event_id = e.id WHERE e.user_id = ?`, [uid]);
   data.eventTodos = await dbAll(`SELECT et.* FROM event_todos et JOIN events e ON et.event_id = e.id WHERE e.user_id = ?`, [uid]);
   data.eventPersonnel = await dbAll(`SELECT ep.* FROM event_personnel ep JOIN events e ON ep.event_id = e.id WHERE e.user_id = ?`, [uid]);
