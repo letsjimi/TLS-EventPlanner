@@ -233,7 +233,7 @@ const Auth = {
   // ADMIN: CREATE USER
   // ═══════════════════════════════════════════════
   isAdmin() {
-    return this.currentUser?.id === 1 || this.currentUser?.role === 'admin';
+    return this.currentUser?.role === 'admin';
   },
 
   async createUser(username, password) {

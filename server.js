@@ -14,6 +14,21 @@ const fs = require('fs');
 
 const app = express();
 const PORT = 8999;
+
+// ─── Async Error Wrapper ─────────────────────
+// Automatically catches rejections in async route handlers
+['get','post','put','delete'].forEach(method => {
+  const orig = app[method].bind(app);
+  app[method] = function(...args) {
+    const wrapped = args.map(arg => {
+      if (typeof arg === 'function' && arg.constructor && arg.constructor.name === 'AsyncFunction') {
+        return (req, res, next) => { arg(req, res, next).catch(next); };
+      }
+      return arg;
+    });
+    return orig(...wrapped);
+  };
+});
 const JWT_SECRET = process.env.TLS_JWT_SECRET || 'tls-dev-secret-2026-change-in-prod';
 const DB_PATH = process.env.TLS_DB_PATH || path.join(__dirname, 'data', 'tms.db');
 
@@ -723,6 +738,12 @@ app.post('/api/import/full', authMW, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─── Global Error Handler ─────────────────────
+app.use((err, req, res, next) => {
+  console.error('API Error:', err.message);
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
 // ─── Catch-all → SPA ────────────────────────

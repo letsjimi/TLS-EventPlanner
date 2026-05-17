@@ -698,6 +698,15 @@ const app = {
     });
   },
 
+  // Helper: sync local Dexie table to server endpoint
+  async _syncTable(table, apiMethod, eventId) {
+    if (!API.token) return;
+    try {
+      const rows = await db[table].where('eventId').equals(eventId).toArray();
+      await API[apiMethod].save(eventId, rows);
+    } catch(e) { console.warn(`API ${apiMethod} sync failed:`, e.message); }
+  },
+
   // ═══════════════════════════════════════════════
   // EVENT DETAIL (Planner)
   // ═══════════════════════════════════════════════
