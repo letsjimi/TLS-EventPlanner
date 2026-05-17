@@ -679,17 +679,17 @@ app.post('/api/import/full', authMW, async (req, res) => {
         // Normalize snake_case -> camelCase and back for robustness
         const orderNumber = ev.orderNumber != null ? ev.orderNumber : (ev.order_number != null ? ev.order_number : 'IMPORT-' + Date.now());
         const orderType   = ev.orderType   != null ? ev.orderType   : (ev.order_type   != null ? ev.order_type   : 'event');
-        const status      = ev.status      != null ? ev.status      : (ev.status      != null ? ev.status      : 'inquiry');
+        const status      = ev.status      != null ? ev.status      : 'inquiry';
         const eventType   = ev.eventType   != null ? ev.eventType   : ev.event_type;
-        const date        = ev.date        != null ? ev.date        : (ev.date        != null ? ev.date        : new Date().toISOString().slice(0,10));
+        const date        = ev.date        != null ? ev.date        : new Date().toISOString().slice(0,10);
         const clientName  = ev.clientName  != null ? ev.clientName  : ev.client_name;
-        const locations   = ev.locations   != null ? ev.locations   : (ev.locations   != null ? ev.locations   : '');
-        const totalPrice  = ev.totalPrice  != null ? ev.totalPrice  : (ev.total_price  != null ? ev.total_price  : 0);
-        const deposit     = ev.deposit     != null ? ev.deposit     : (ev.deposit     != null ? ev.deposit     : 0);
-        const remaining   = ev.remaining   != null ? ev.remaining   : (ev.remaining   != null ? ev.remaining   : (totalPrice - deposit));
-        const notes       = ev.notes       != null ? ev.notes       : (ev.notes       != null ? ev.notes       : '');
-        const km          = ev.km          != null ? ev.km          : (ev.km          != null ? ev.km          : 0);
-        const duration    = ev.duration    != null ? ev.duration    : (ev.duration    != null ? ev.duration    : 1);
+        const locations   = ev.locations   != null ? ev.locations   : '';
+        const totalPrice  = ev.totalPrice  != null ? ev.totalPrice  : (ev.total_price != null ? ev.total_price : 0);
+        const deposit     = ev.deposit     != null ? ev.deposit     : 0;
+        const remaining   = ev.remaining   != null ? ev.remaining   : (totalPrice - deposit);
+        const notes       = ev.notes       != null ? ev.notes       : '';
+        const km          = ev.km          != null ? ev.km          : 0;
+        const duration    = ev.duration    != null ? ev.duration    : 1;
         const result = await dbRun(
           `INSERT INTO events (user_id, order_number, order_type, status, event_type, date, client_name, locations, total_price, deposit, remaining, notes, km, duration)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
