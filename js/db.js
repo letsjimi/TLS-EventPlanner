@@ -5,6 +5,31 @@
 
 const db = new Dexie('TLS_EventManager_v3');
 
+db.version(7).stores({
+  events: '++id, userId, orderNumber, status, eventType, date, clientName, totalPrice, orderType, synced',
+  locations: '++id, eventId, sortOrder',
+  contacts: '++id, eventId, role, name',
+  timeline: '++id, eventId, time, sortOrder',
+  equipmentItems: '++id, eventId, category, name, needed',
+  equipmentCatalog: '++id, userId, category, name, tags, isExternal, synced',
+  equipmentPackages: '++id, userId, name, tags',
+  payments: '++id, eventId, type, status',
+  settings: '[userId+key]',
+  eventTodos: '++id, eventId, dueDate, done',
+  users: '++id, username',
+  eventPersonnel: '++id, eventId, role'
+}).upgrade(async tx => {
+  const events = await tx.events.toArray();
+  for (const ev of events) {
+    if (ev.synced === undefined) await tx.events.update(ev.id, { synced: 1 });
+    if (!ev.orderType) await tx.events.update(ev.id, { orderType: 'event' });
+  }
+  const cats = await tx.equipmentCatalog.toArray();
+  for (const c of cats) {
+    if (c.synced === undefined) await tx.equipmentCatalog.update(c.id, { synced: 1 });
+  }
+});
+
 db.version(6).stores({
   events: '++id, userId, orderNumber, status, eventType, date, clientName, totalPrice, orderType, synced',
   locations: '++id, eventId, sortOrder',

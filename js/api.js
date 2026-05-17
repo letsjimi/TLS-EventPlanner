@@ -278,6 +278,30 @@ const API = {
       await API.sync.pushAll();
       await API.sync.pullCatalog();
       await API.sync.pushCatalog();
+      // Sync settings
+      await API.sync.pushSettings();
+      await API.sync.pullSettings();
+    },
+
+    async pushSettings() {
+      if (!API.token) return;
+      const localRows = await db.settings.where('userId').equals(Auth.userId || 1).toArray();
+      if (!localRows.length) return;
+      try {
+        await API.settings.save(localRows.map(r => ({ key: r.key, value: r.value })));
+      } catch (e) { console.warn('Push settings failed:', e.message); }
+    },
+
+    async pullSettings() {
+      if (!API.token) return;
+      try {
+        const remote = await API.settings.list();
+        if (!remote || !remote.length) return;
+        const userId = Auth.userId || 1;
+        for (const s of remote) {
+          await db.settings.put({ userId, key: s.key, value: s.value });
+        }
+      } catch (e) { console.warn('Pull settings failed:', e.message); }
     }
   }
 };

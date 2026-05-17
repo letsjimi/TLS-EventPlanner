@@ -533,6 +533,7 @@ const app = {
       { name: 'locations', label: 'Location(en)', placeholder: 'z.B. Kirche → Festhalle' },
       { name: 'totalPrice', label: 'Gesamtpreis (€)', type: 'number', step: '0.01' },
       { name: 'deposit', label: 'Anzahlung (€)', type: 'number', step: '0.01' },
+      { name: 'km', label: 'Kilometer (km)', type: 'number', step: '1' },
       { name: 'status', label: 'Status', type: 'select', options: [
         { value: 'inquiry', label: 'Anfrage' },
         { value: 'offer', label: 'Angebot' },
@@ -562,7 +563,9 @@ const app = {
       async () => {
         const data = UI.getFormData(document.getElementById('event-form'));
         data.orderType = data.orderType || 'event';
-        data.remaining = (data.totalPrice || 0) - (data.deposit || 0);
+        const total = data.totalPrice !== undefined ? data.totalPrice : e.totalPrice;
+        const dep = data.deposit !== undefined ? data.deposit : e.deposit;
+        data.remaining = total - dep;
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
         data.userId = Auth.userId || 1;
@@ -638,6 +641,7 @@ const app = {
       { name: 'locations', label: 'Location(en)' },
       { name: 'totalPrice', label: 'Gesamtpreis', type: 'number', step: '0.01' },
       { name: 'deposit', label: 'Anzahlung', type: 'number', step: '0.01' },
+      { name: 'km', label: 'Kilometer', type: 'number', step: '1' },
       { name: 'status', label: 'Status', type: 'select', options: [
         { value: 'inquiry', label: 'Anfrage' },
         { value: 'offer', label: 'Angebot' },
@@ -660,7 +664,9 @@ const app = {
       </form>`,
       async () => {
         const data = UI.getFormData(document.getElementById('edit-form'));
-        data.remaining = (data.totalPrice || 0) - (data.deposit || 0);
+        const total = data.totalPrice !== undefined ? data.totalPrice : e.totalPrice;
+        const dep = data.deposit !== undefined ? data.deposit : e.deposit;
+        data.remaining = total - dep;
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
         data.userId = Auth.userId || 1;
@@ -1953,12 +1959,11 @@ const app = {
       try {
         const data = JSON.parse(text);
 
-        // If online and logged in, push to server first
         if (API.token) {
           try {
             await API.import.full(data);
-            // After server import, pull events back to local DB via sync
-            await API.sync.pullEvents();
+            // After server import, pull all data back via full sync
+            await API.sync.all();
             UI.toast('Daten auf Server importiert', 'success');
             this.navigate('#dashboard');
             return;
@@ -3047,6 +3052,8 @@ const app = {
       data.deposit = data.deposit || 0;
       data.duration = 1;
       data.km = 0;
+      data.deposit = data.deposit || 0;
+      data.remaining = data.totalPrice - data.deposit;
       data.synced = API.token ? 0 : 1;
       let id;
       if (API.token) {

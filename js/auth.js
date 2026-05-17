@@ -114,6 +114,15 @@ const Auth = {
       API.token = res.token;
       localStorage.setItem('jwt', res.token);
       this.currentUser = { id: res.user.id, username: res.user.username, displayName: res.user.displayName, role: res.user.isAdmin ? 'admin' : 'user' };
+      // Persistiere lokal für Offline-Fallback
+      try {
+        const localUser = await db.users.where('username').equals(username).first();
+        if (!localUser) {
+          await db.users.add({ username, password, role: this.currentUser.role, displayName: this.currentUser.displayName });
+        } else {
+          await db.users.update(localUser.id, { password, role: this.currentUser.role, displayName: this.currentUser.displayName });
+        }
+      } catch (e) { console.warn('Local user cache failed:', e); }
       this.hideLogin();
       await app.initWithUser();
       UI.toast('Willkommen, ' + this.currentUser.displayName + '!', 'success');

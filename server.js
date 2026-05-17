@@ -330,10 +330,12 @@ app.put('/api/events/:id', authMW, async (req, res) => {
   const notes       = d.notes       !== undefined ? d.notes       : event.notes;
   const km          = d.km          !== undefined ? d.km          : event.km;
   const duration    = d.duration    !== undefined ? d.duration    : event.duration;
+  const computedRemaining = (totalPrice || 0) - (deposit || 0);
+  const finalRemaining = (d.totalPrice !== undefined || d.deposit !== undefined) ? computedRemaining : remaining;
   await dbRun(
     `UPDATE events SET order_number=?, order_type=?, status=?, event_type=?, date=?, client_name=?, locations=?, total_price=?, deposit=?, remaining=?, notes=?, km=?, duration=?, updated_at=CURRENT_TIMESTAMP
      WHERE id = ?`,
-    [orderNumber, orderType, status, eventType, date, clientName, locations, totalPrice, deposit, remaining, notes, km, duration||1, req.params.id]
+    [orderNumber, orderType, status, eventType, date, clientName, locations, totalPrice, deposit, finalRemaining, notes, km, duration||1, req.params.id]
   );
   res.json({ success: true });
 });
