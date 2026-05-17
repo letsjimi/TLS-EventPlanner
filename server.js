@@ -271,8 +271,8 @@ async function initSchema() {
 
 initSchema().then(async () => {
   // ─── Startup Migrations (additive only) ───
-  const hasDesc = await dbGet(`PRAGMA table_info(equipment_packages)`).catch(() => []);
-  if (Array.isArray(hasDesc) && !hasDesc.some(c => c.name === 'description')) {
+  const cols = await dbAll(`PRAGMA table_info(equipment_packages)`).catch(() => []);
+  if (Array.isArray(cols) && !cols.some(c => c.name === 'description')) {
     await dbRun(`ALTER TABLE equipment_packages ADD COLUMN description TEXT`).catch(() => {}); // ignore if already exists
   }
 }).catch(err => console.error('Schema init error:', err));

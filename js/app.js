@@ -570,6 +570,7 @@ const app = {
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
         data.userId = Auth.userId || 1;
         data.synced = API.token ? 0 : 1;
+        data.createdAt = new Date().toISOString();
 
         let id;
         if (API.token) {
@@ -670,6 +671,7 @@ const app = {
         data.statusLabel = { inquiry:'Anfrage', offer:'Angebot', inspected:'Besichtigt',
           confirmed:'Bestätigt', paid:'Bezahlt', done:'Abgeschlossen', cancelled:'Storniert' }[data.status];
         data.userId = Auth.userId || 1;
+        data.updatedAt = new Date().toISOString();
         if (API.token) {
           try { await API.events.update(id, data); } catch(e) { console.warn('API update failed:', e.message); }
         }
@@ -3108,6 +3110,7 @@ const app = {
       data.date = dateStr;
       data.userId = Auth.userId || 1;
       data.orderType = 'event';
+      data.createdAt = new Date().toISOString();
       const total = parseFloat(data.totalPrice) || 0;
       const dep = parseFloat(data.deposit) || 0;
       data.remaining = total - dep;
