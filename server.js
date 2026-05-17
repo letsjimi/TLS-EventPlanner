@@ -271,10 +271,12 @@ async function initSchema() {
 
 initSchema().then(async () => {
   // ─── Startup Migrations (additive only) ───
-  const cols = await dbAll(`PRAGMA table_info(equipment_packages)`).catch(() => []);
-  if (Array.isArray(cols) && !cols.some(c => c.name === 'description')) {
-    await dbRun(`ALTER TABLE equipment_packages ADD COLUMN description TEXT`).catch(() => {}); // ignore if already exists
-  }
+  try {
+    const cols = await dbAll(`PRAGMA table_info(equipment_packages)`);
+    if (Array.isArray(cols) && !cols.some(c => c.name === 'description')) {
+      await dbRun(`ALTER TABLE equipment_packages ADD COLUMN description TEXT`).catch(() => {});
+    }
+  } catch (e) { console.error('Migration check failed:', e.message); }
 }).catch(err => console.error('Schema init error:', err));
 
 // ─── Auth ────────────────────────────────────
@@ -334,7 +336,14 @@ app.get('/api/auth/users', authMW, adminMW, async (req, res) => {
 });
 
 // ─── CRUD Events ────────────────────────────
-app.get('/api/events', authMW, async (req, res) => {
+app.get('/api/events', async (req, res) => {
+  // Allow unauthenticated health-check clients to see []
+  if (!req.headers.authorization) return res.json([]);
+  try {
+    req.user = jwt.verify(req.headers.authorization.replace('Bearer ', ''), JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
   const rows = await dbAll(
     `SELECT * FROM events WHERE user_id = ? ORDER BY date DESC`,
     [req.user.id]
